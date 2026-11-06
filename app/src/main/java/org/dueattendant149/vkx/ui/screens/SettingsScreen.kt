@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -29,8 +30,11 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,6 +51,7 @@ fun SettingsScreen(
     onHistory: () -> Unit,
 ) {
     val context = LocalContext.current
+    val showAbout = remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Настройки") },
@@ -83,12 +88,23 @@ fun SettingsScreen(
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SettingsRow("История", Icons.Rounded.History, onHistory)
             SettingsRow("О приложении", Icons.Rounded.Info) {
-                Toast.makeText(context, "VK X · KWhale music", Toast.LENGTH_SHORT).show()
+                showAbout.value = true
             }
             SettingsRow("Для разработчика", Icons.Rounded.Code) {
                 Toast.makeText(context, "API: music.dueattendant149.org/v1", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    if (showAbout.value) {
+        AlertDialog(
+            onDismissRequest = { showAbout.value = false },
+            title = { Text("О приложении") },
+            text = { Text("VK X · KWhale music\nМузыкальный сервис KWhale") },
+            confirmButton = {
+                TextButton(onClick = { showAbout.value = false }) { Text("OK") }
+            },
+        )
     }
 }
 

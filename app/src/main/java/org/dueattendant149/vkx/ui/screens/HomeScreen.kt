@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -201,7 +202,12 @@ fun HomeScreen(
         }
         item {
             Text(
-                text = "Добрый вечер",
+                text = when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
+                    in 5..11 -> "Доброе утро"
+                    in 12..16 -> "Добрый день"
+                    in 17..22 -> "Добрый вечер"
+                    else -> "Доброй ночи"
+                },
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 12.dp),
@@ -386,26 +392,24 @@ fun HomeScreen(
                 }
                 "liked" -> {
                     item { SectionHeader("Любимое", action = "Все", onAction = { onSeeAll("liked") }) }
-                    item {
-                        TrackList(
-                            section = section,
-                            app = app,
-                            liked = liked,
-                            onPlay = { tracks, index ->
-                                app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
-                            },
-                            onToggleLike = { track ->
-                                val next = liked[track.id] ?: !track.isLiked
-                                liked[track.id] = next
-                                scope.launch {
-                                    runCatching {
-                                        if (next) app.api.like(track.id) else app.api.unlike(track.id)
-                                    }
+                    TrackItems(
+                        section = section,
+                        app = app,
+                        liked = liked,
+                        onPlay = { tracks, index ->
+                            app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
+                        },
+                        onToggleLike = { track ->
+                            val next = liked[track.id] ?: !track.isLiked
+                            liked[track.id] = next
+                            scope.launch {
+                                runCatching {
+                                    if (next) app.api.like(track.id) else app.api.unlike(track.id)
                                 }
-                            },
-                            onMenu = onTrackMenu,
-                        )
-                    }
+                            }
+                        },
+                        onMenu = onTrackMenu,
+                    )
                 }
                 "playlists" -> {
                     item { SectionHeader("Плейлисты", action = "Все", onAction = { onSeeAll("playlists") }) }
@@ -460,27 +464,25 @@ fun HomeScreen(
                             }
                         }
                         "list" -> {
-                            item {
-                                SectionHeader(section.title ?: "Треки")
-                                TrackList(
-                                    section = section,
-                                    app = app,
-                                    liked = liked,
-                                    onPlay = { tracks, index ->
-                                        app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
-                                    },
-                                    onToggleLike = { track ->
-                                        val next = liked[track.id] ?: !track.isLiked
-                                        liked[track.id] = next
-                                        scope.launch {
-                                            runCatching {
-                                                if (next) app.api.like(track.id) else app.api.unlike(track.id)
-                                            }
+                            item { SectionHeader(section.title ?: "Треки") }
+                            TrackItems(
+                                section = section,
+                                app = app,
+                                liked = liked,
+                                onPlay = { tracks, index ->
+                                    app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
+                                },
+                                onToggleLike = { track ->
+                                    val next = liked[track.id] ?: !track.isLiked
+                                    liked[track.id] = next
+                                    scope.launch {
+                                        runCatching {
+                                            if (next) app.api.like(track.id) else app.api.unlike(track.id)
                                         }
-                                    },
-                                    onMenu = onTrackMenu,
-                                )
-                            }
+                                    }
+                                },
+                                onMenu = onTrackMenu,
+                            )
                         }
                     }
                 }
@@ -545,8 +547,7 @@ private fun TrackCarousel(
     }
 }
 
-@Composable
-private fun TrackList(
+private fun LazyListScope.TrackItems(
     section: HomeSection,
     app: VkxApp,
     liked: Map<String, Boolean>,
@@ -555,16 +556,16 @@ private fun TrackList(
     onMenu: (ApiTrack) -> Unit,
 ) {
     val tracks = section.items.mapNotNull { it.track }
-    Column {
-        tracks.forEachIndexed { index, track ->
-            TrackRow(
-                track = track,
-                api = app.api,
-                liked = liked[track.id] ?: track.isLiked,
-                onClick = { onPlay(tracks, index) },
-                onToggleLike = { onToggleLike(track) },
-                onOverflow = { onMenu(track) },
-            )
-        }
+    // lazily emitted into the parent LazyColumn (a nested Column rendered the whole
+    // "Любимое" list eagerly, which is O(N) for large libraries)
+    itemsIndexed(tracks, key = { index, track -> "${track.id}-$index" }) { index, track ->
+        TrackRow(
+            track = track,
+            api = app.api,
+            liked = liked[track.id] ?: track.isLiked,
+            onClick = { onPlay(tracks, index) },
+            onToggleLike = { onToggleLike(track) },
+            onOverflow = { onMenu(track) },
+        )
     }
 }

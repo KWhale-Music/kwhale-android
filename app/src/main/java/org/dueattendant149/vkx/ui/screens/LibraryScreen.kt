@@ -214,7 +214,7 @@ fun LibraryScreen(
                     title = "Пока пусто",
                     message = "Лайкните трек, чтобы он появился здесь",
                     action = "Найти музыку",
-                    onAction = { onSeeAll("search") },
+                    onAction = onSearch,
                 )
             }
         }

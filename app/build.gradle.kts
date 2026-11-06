@@ -24,7 +24,10 @@ android {
             buildConfigField("String", "API_BASE_URL", "\"http://127.0.0.1:19001/v1\"")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // TODO: подписать настоящим release-ключом (сейчас debug — ок для локального билда)
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -43,7 +46,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-        viewBinding = true
+        viewBinding = false
     }
 }
 

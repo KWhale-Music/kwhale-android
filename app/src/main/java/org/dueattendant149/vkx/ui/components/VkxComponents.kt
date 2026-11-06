@@ -64,13 +64,13 @@ fun formatDuration(ms: Long): String {
 fun ApiTrack.artistLine(): String =
     artists.joinToString(", ") { it.name }.ifBlank { "Неизвестный артист" }
 
-fun ApiTrack.imageUrl(api: VkxApi): String? = cover?.let { api.imageUrl(it.id) }
+fun ApiTrack.imageUrl(api: VkxApi, size: String = "md"): String? = cover?.let { api.imageUrl(it.id, size) }
 
-fun Album.imageUrl(api: VkxApi): String? = cover?.let { api.imageUrl(it.id) }
+fun Album.imageUrl(api: VkxApi, size: String = "md"): String? = cover?.let { api.imageUrl(it.id, size) }
 
-fun Playlist.imageUrl(api: VkxApi): String? = cover?.let { api.imageUrl(it.id) }
+fun Playlist.imageUrl(api: VkxApi, size: String = "md"): String? = cover?.let { api.imageUrl(it.id, size) }
 
-fun Artist.imageUrl(api: VkxApi): String? = avatar?.let { api.imageUrl(it.id) }
+fun Artist.imageUrl(api: VkxApi, size: String = "md"): String? = avatar?.let { api.imageUrl(it.id, size) }
 
 @Composable
 fun CoverArt(
@@ -168,7 +168,7 @@ fun TrackRow(
         }
         if (showCover) {
             CoverArt(
-                imageUrl = track.imageUrl(api),
+                imageUrl = track.imageUrl(api, size = "sm"),
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(8.dp),
                 iconSize = 20,
