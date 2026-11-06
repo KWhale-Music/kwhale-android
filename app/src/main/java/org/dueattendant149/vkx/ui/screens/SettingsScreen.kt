@@ -1,5 +1,8 @@
 package org.dueattendant149.vkx.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -28,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -67,7 +71,14 @@ fun SettingsScreen(
             }
             SettingsRow("Загрузки", Icons.Rounded.CloudDownload, onDownloads)
             SettingsRow("Уведомления", Icons.Rounded.Notifications) {
-                Toast.makeText(context, "Уведомления включены", Toast.LENGTH_SHORT).show()
+                val granted = Build.VERSION.SDK_INT < 33 ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+                Toast.makeText(
+                    context,
+                    if (granted) "Уведомления включены" else "Уведомления отключены (разрешите в системе)",
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SettingsRow("История", Icons.Rounded.History, onHistory)

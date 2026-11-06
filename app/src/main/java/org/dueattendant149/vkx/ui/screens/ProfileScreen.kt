@@ -105,8 +105,8 @@ fun ProfileScreen(
             email = me.email.orEmpty()
             avatar = me.avatar?.let { app.api.imageUrl(it.id) }
         }
-        trackCount = runCatching { app.api.libraryTracks(limit = 100).items.size }.getOrDefault(0)
-        playlistCount = runCatching { app.api.libraryPlaylists(limit = 100).items.size }.getOrDefault(0)
+        trackCount = runCatching { app.api.libraryTracks(limit = 1).total }.getOrNull() ?: 0
+        playlistCount = runCatching { app.api.libraryPlaylists(limit = 1).total }.getOrNull() ?: 0
         downloadCount = DownloadStore(context).all().count { it.file().exists() }
         loading = false
     }

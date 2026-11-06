@@ -5,6 +5,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.dueattendant149.vkx.network.model.Session
 import org.dueattendant149.vkx.network.model.User
 import org.junit.After
@@ -136,6 +137,40 @@ class VkxApiTest {
         assertEquals("Bearer access-2", retry.getHeader("Authorization"))
 
         assertEquals("access-2", api.session()?.accessToken)
+    }
+
+    @Test
+    fun networkErrorDuringRefreshDoesNotClearSession() = runBlocking {
+        // 401 on the main call triggers a refresh; the refresh itself hits a
+        // dropped connection (IOException). The stored session must survive —
+        // a network blip must never log the user out.
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(401)
+                .setHeader("Content-Type", "application/problem+json")
+                .setBody("""{"status":401,"title":"Unauthorized","code":"token_expired"}"""),
+        )
+        server.enqueue(
+            MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START),
+        )
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"sections":[]}"""),
+        )
+
+        val oldSession = Session(
+            accessToken = "access-1",
+            refreshToken = "refresh-1",
+            expiresAtEpochSec = 1L,
+            user = User(id = "user_1", displayName = "Demo"),
+        )
+        val api = ApiFactory.createInMemory(config(), oldSession)
+
+        runCatching { api.home() }
+
+        assertEquals("access-1", api.session()?.accessToken)
     }
 
     @Test

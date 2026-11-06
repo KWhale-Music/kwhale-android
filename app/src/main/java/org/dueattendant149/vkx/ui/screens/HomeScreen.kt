@@ -445,6 +445,20 @@ fun HomeScreen(
                                 }
                             }
                         }
+                        "shelf" -> {
+                            // recommendation track shelves (for_you / discovery)
+                            item {
+                                SectionHeader(section.title ?: "Треки")
+                                TrackCarousel(
+                                    section = section,
+                                    app = app,
+                                    onPlay = { tracks, index ->
+                                        app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
+                                    },
+                                    onMenu = onTrackMenu,
+                                )
+                            }
+                        }
                         "list" -> {
                             item {
                                 SectionHeader(section.title ?: "Треки")

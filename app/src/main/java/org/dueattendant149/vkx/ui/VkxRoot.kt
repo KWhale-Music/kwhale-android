@@ -494,8 +494,13 @@ private fun AddToPlaylistSheet(
                         modifier = Modifier.clickable {
                             scope.launch {
                                 runCatching { app.api.addPlaylistTracks(playlist.id, listOf(track.id)) }
-                                Toast.makeText(context, "Добавлено в плейлист", Toast.LENGTH_SHORT).show()
-                                onDone()
+                                    .onSuccess {
+                                        Toast.makeText(context, "Добавлено в плейлист", Toast.LENGTH_SHORT).show()
+                                        onDone()
+                                    }
+                                    .onFailure {
+                                        Toast.makeText(context, "Не удалось добавить в плейлист", Toast.LENGTH_SHORT).show()
+                                    }
                             }
                         },
                     )

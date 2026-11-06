@@ -52,6 +52,7 @@ data class HistoryEntry(
 data class HistoryPage(
     val items: List<HistoryEntry> = emptyList(),
     val nextCursor: String? = null,
+    val total: Int? = null,
 )
 
 @Serializable

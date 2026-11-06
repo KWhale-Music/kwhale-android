@@ -123,13 +123,14 @@ class ApiClient(
         path: String,
         destination: File,
         onProgress: (downloaded: Long, total: Long?) -> Unit = { _, _ -> },
-    ) = withContext(Dispatchers.IO) {
+    ): String? = withContext(Dispatchers.IO) {
         val request = buildRequest("GET", path, null, emptyMap())
         authenticatedClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw problem(response.code, response.body?.string().orEmpty())
             }
             val body = response.body ?: throw IOException("Empty download body")
+            val contentType = response.header("Content-Type")
             val total = body.contentLength().takeIf { it > 0L }
             destination.parentFile?.mkdirs()
             body.byteStream().use { input ->
@@ -145,6 +146,7 @@ class ApiClient(
                     }
                 }
             }
+            contentType
         }
     }
 
@@ -217,20 +219,27 @@ class ApiClient(
         val current = tokenStore.load() ?: return null
         val body = json.encodeToString(RefreshRequest.serializer(), RefreshRequest(current.refreshToken))
         val request = buildRequest("POST", "/auth/refresh", body, emptyMap())
-        return runCatching {
+        return try {
             plainClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    tokenStore.clear()
-                    return null
+                when {
+                    // Refresh token invalid/revoked: the session is genuinely over.
+                    response.code == 401 || response.code == 403 -> {
+                        tokenStore.clear()
+                        null
+                    }
+                    // Transient server failure (5xx/429/...): keep the stored session.
+                    !response.isSuccessful -> null
+                    else -> {
+                        val text = response.body?.string().orEmpty()
+                        val auth = json.decodeFromString(AuthResponse.serializer(), text)
+                        val session = auth.toSession()
+                        tokenStore.save(session)
+                        session
+                    }
                 }
-                val text = response.body?.string().orEmpty()
-                val auth = json.decodeFromString(AuthResponse.serializer(), text)
-                val session = auth.toSession()
-                tokenStore.save(session)
-                session
             }
-        }.getOrElse {
-            tokenStore.clear()
+        } catch (_: IOException) {
+            // Network failure during refresh: never log the user out over a blip.
             null
         }
     }

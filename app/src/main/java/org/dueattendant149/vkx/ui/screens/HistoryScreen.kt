@@ -15,6 +15,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -45,13 +46,16 @@ fun HistoryScreen(
     onTrackMenu: (ApiTrack) -> Unit,
 ) {
     var tracks by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
+    var nextCursor by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var loadingMore by remember { mutableStateOf(false) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        tracks = runCatching { app.api.history(limit = 50).items.map { it.track } }
-            .getOrDefault(emptyList())
+        val page = runCatching { app.api.history(limit = 50) }.getOrNull()
+        tracks = page?.items?.map { it.track } ?: emptyList()
+        nextCursor = page?.nextCursor
         loading = false
     }
 
@@ -102,6 +106,32 @@ fun HistoryScreen(
                     },
                     onOverflow = { onTrackMenu(track) },
                 )
+            }
+            if (nextCursor != null) {
+                item {
+                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        if (loadingMore) {
+                            CircularProgressIndicator()
+                        } else {
+                            Button(onClick = {
+                                val cursor = nextCursor
+                                if (cursor != null && !loadingMore) {
+                                    loadingMore = true
+                                    scope.launch {
+                                        runCatching { app.api.history(cursor = cursor, limit = 50) }
+                                            .onSuccess { page ->
+                                                tracks = tracks + page.items.map { it.track }
+                                                nextCursor = page.nextCursor
+                                            }
+                                        loadingMore = false
+                                    }
+                                }
+                            }) {
+                                Text("Показать ещё")
+                            }
+                        }
+                    }
+                }
             }
         }
     }

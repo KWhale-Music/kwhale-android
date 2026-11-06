@@ -99,9 +99,11 @@ fun TrackMenuSheet(
             icon = if (liked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
             title = if (liked) "Убрать из моей музыки" else "В мою музыку",
             onClick = {
+                val wasLiked = liked
                 liked = !liked
                 scope.launch {
                     runCatching { if (liked) app.api.like(track.id) else app.api.unlike(track.id) }
+                        .onFailure { liked = wasLiked }
                 }
             },
         )
@@ -139,11 +141,25 @@ fun TrackMenuSheet(
             title = if (disliked) "Убрать дизлайк" else "Скрыть из рекомендаций",
             tint = MaterialTheme.colorScheme.error,
             onClick = {
+                val wasDisliked = disliked
                 disliked = !disliked
                 scope.launch {
-                    runCatching { if (disliked) app.api.dislike(track.id) else app.api.undislike(track.id) }
-                    if (disliked) app.player.next()
-                    Toast.makeText(context, "Трек скрыт из рекомендаций", Toast.LENGTH_SHORT).show()
+                    runCatching {
+                        if (disliked) app.api.dislike(track.id) else app.api.undislike(track.id)
+                    }.onSuccess {
+                        // пропускаем только когда скрываем именно играющий сейчас трек
+                        if (disliked && app.player.state.value.current?.remoteId == track.id) {
+                            app.player.next()
+                        }
+                        Toast.makeText(
+                            context,
+                            if (disliked) "Трек скрыт из рекомендаций" else "Дизлайк убран",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }.onFailure {
+                        disliked = wasDisliked
+                        Toast.makeText(context, "Не удалось изменить", Toast.LENGTH_SHORT).show()
+                    }
                     onDismiss()
                 }
             },

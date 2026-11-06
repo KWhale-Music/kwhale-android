@@ -30,11 +30,12 @@ class DownloadWorker(
         val app = applicationContext as VkxApp
         val store = DownloadStore(applicationContext)
         val safeId = remoteId.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val destination = File(store.downloadsDir(applicationContext), "$safeId.mp3")
+        val dir = store.downloadsDir(applicationContext)
+        val destination = File(dir, "$safeId.mp3")
 
         setForeground(createForegroundInfo(title, 0))
         return try {
-            app.api.downloadTrack(remoteId, destination) { downloaded, total ->
+            val mime = app.api.downloadTrack(remoteId, destination) { downloaded, total ->
                 val percent = if (total != null && total > 0) {
                     ((downloaded * 100) / total).toInt()
                 } else {
@@ -42,23 +43,39 @@ class DownloadWorker(
                 }
                 setProgressAsync(workDataOf(KEY_PROGRESS to percent))
             }
+            // keep the real format's extension (a FLAC stream saved as .mp3 is misleading)
+            var finalDest = destination
+            val ext = extForMime(mime)
+            if (ext != "mp3") {
+                val renamed = File(dir, "$safeId.$ext")
+                if (destination.renameTo(renamed)) finalDest = renamed
+            }
             store.save(
                 DownloadedTrack(
                     remoteId = remoteId,
                     streamUrl = streamUrl,
                     title = title,
                     artist = artist,
-                    filePath = destination.absolutePath,
+                    filePath = finalDest.absolutePath,
                     coverUrl = coverUrl,
                     durationSec = durationSec,
-                    bytes = destination.length(),
+                    bytes = finalDest.length(),
                 ),
             )
-            Result.success(workDataOf(KEY_PATH to destination.absolutePath))
+            Result.success(workDataOf(KEY_PATH to finalDest.absolutePath))
         } catch (error: Exception) {
             destination.delete()
             if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
+    }
+
+    private fun extForMime(mime: String?): String = when (mime?.substringBefore(";")?.lowercase()) {
+        "audio/flac", "audio/x-flac" -> "flac"
+        "audio/mp4", "audio/m4a", "audio/x-m4a" -> "m4a"
+        "audio/ogg", "application/ogg" -> "ogg"
+        "audio/wav", "audio/x-wav" -> "wav"
+        "audio/aac" -> "aac"
+        else -> "mp3"
     }
 
     private fun createForegroundInfo(title: String, progress: Int): ForegroundInfo {

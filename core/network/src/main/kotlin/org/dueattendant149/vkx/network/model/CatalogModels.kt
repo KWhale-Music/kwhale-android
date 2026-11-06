@@ -80,6 +80,7 @@ data class Playlist(
 data class TracksPage(
     val items: List<Track> = emptyList(),
     val nextCursor: String? = null,
+    val total: Int? = null,
 )
 
 @Serializable
@@ -98,6 +99,7 @@ data class ArtistsPage(
 data class PlaylistsPage(
     val items: List<Playlist> = emptyList(),
     val nextCursor: String? = null,
+    val total: Int? = null,
 )
 
 @Serializable

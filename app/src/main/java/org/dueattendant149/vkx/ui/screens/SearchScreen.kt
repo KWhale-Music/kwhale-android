@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -73,6 +74,8 @@ fun SearchScreen(
     var genres by remember { mutableStateOf<List<org.dueattendant149.vkx.network.model.Genre>>(emptyList()) }
     var topArtists by remember { mutableStateOf<List<org.dueattendant149.vkx.network.model.Artist>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var searchTick by remember { mutableStateOf(0) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
@@ -83,17 +86,22 @@ fun SearchScreen(
         topArtists = runCatching { app.api.topArtists(limit = 12).items }.getOrDefault(emptyList())
     }
 
-    LaunchedEffect(query) {
+    LaunchedEffect(query, searchTick) {
         if (query.isBlank()) {
             results = null
+            error = null
             loading = false
             return@LaunchedEffect
         }
         delay(350)
         loading = true
+        error = null
         runCatching { app.api.search(query.trim(), limit = 30) }
             .onSuccess { results = it }
-            .onFailure { results = null }
+            .onFailure {
+                results = null
+                error = "Не удалось выполнить поиск"
+            }
         loading = false
     }
 
@@ -181,7 +189,22 @@ fun SearchScreen(
                 }
             } else {
                 val data = results
-                if (data == null || (data.tracks.isEmpty() && data.albums.isEmpty() && data.artists.isEmpty() && data.playlists.isEmpty())) {
+                val err = error
+                if (err != null) {
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = err,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Button(onClick = { searchTick++ }) {
+                                Text("Повторить")
+                            }
+                        }
+                    }
+                } else if (data == null || (data.tracks.isEmpty() && data.albums.isEmpty() && data.artists.isEmpty() && data.playlists.isEmpty())) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
                             text = "Ничего не найдено",

@@ -39,9 +39,9 @@ class PlayerWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as VkxApp
         val theme = VkxThemeCatalog.byId(app.settings.themeId)
+        val state = app.player.state.value
+        val track = state.current
         provideContent {
-            val state = app.player.state.value
-            val track = state.current
             Column(
                 modifier = GlanceModifier
                     .fillMaxSize()

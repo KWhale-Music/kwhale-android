@@ -214,20 +214,32 @@ fun CollectionScreen(
                         icon = if (likedAll) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                         label = if (likedAll) "Добавлено" else "Добавить",
                     ) {
-                        likedAll = !likedAll
-                        scope.launch {
-                            runCatching {
-                                when (kind) {
-                                    "album" -> app.api.likeAlbumTracks(collectionId)
-                                    "playlist" -> app.api.likePlaylistTracks(collectionId)
-                                    else -> Unit
+                        when {
+                            kind == "artist" -> {
+                                // follow-artist endpoint не реализован — не врём об успехе
+                                Toast.makeText(context, "Подписка на артиста скоро", Toast.LENGTH_SHORT).show()
+                            }
+                            likedAll -> {
+                                // unlike-all не реализован — не притворяемся, что выключаем
+                                Toast.makeText(context, "Уже в библиотеке", Toast.LENGTH_SHORT).show()
+                            }
+                            else -> {
+                                val previous = likedAll
+                                likedAll = true
+                                scope.launch {
+                                    runCatching {
+                                        when (kind) {
+                                            "album" -> app.api.likeAlbumTracks(collectionId)
+                                            "playlist" -> app.api.likePlaylistTracks(collectionId)
+                                            else -> Unit
+                                        }
+                                    }.onSuccess {
+                                        Toast.makeText(context, "Добавлено в библиотеку", Toast.LENGTH_SHORT).show()
+                                    }.onFailure {
+                                        likedAll = previous
+                                        Toast.makeText(context, "Не удалось добавить", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
-                            }.onSuccess {
-                                Toast.makeText(
-                                    context,
-                                    if (likedAll) "Добавлено в библиотеку" else "Убрано из библиотеки",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
                             }
                         }
                     }
@@ -236,7 +248,7 @@ fun CollectionScreen(
                     }
                     ActionItem(icon = Icons.Rounded.QueueMusic, label = "В очередь") {
                         if (tracks.isNotEmpty()) {
-                            app.player.playQueue(tracks.map { it.toUi(app.api) }, 0)
+                            app.player.addQueue(tracks.map { it.toUi(app.api) })
                         }
                     }
                 }

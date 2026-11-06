@@ -4,8 +4,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.ContextCompat
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -50,6 +52,9 @@ class Media3Player(
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
+    private val _playbackError = MutableStateFlow<String?>(null)
+    val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
+
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = publish()
 
@@ -84,6 +89,12 @@ class Media3Player(
             lastIndex = newIdx
             publish()
         }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Log.e("KWhale", "playback error: ${error.errorCodeName}", error)
+            _playbackError.value = error.errorCodeName
+            publish()
+        }
     }
 
     init {
@@ -108,6 +119,7 @@ class Media3Player(
     fun playQueue(tracks: List<Track>, startIndex: Int = 0, surface: String = "player") {
         if (tracks.isEmpty()) return
         currentSurface = surface
+        _playbackError.value = null
         val current = controller
         if (current == null) {
             pendingQueue = tracks
@@ -123,6 +135,26 @@ class Media3Player(
         current.prepare()
         current.play()
         queue.getOrNull(safeIndex)?.let { events.play(it, currentSurface) }
+        publish()
+    }
+
+    /** Append [tracks] to the end of the queue without interrupting playback. */
+    fun addQueue(tracks: List<Track>, surface: String = "player") {
+        if (tracks.isEmpty()) return
+        currentSurface = surface
+        val current = controller
+        if (current == null) {
+            pendingQueue = (pendingQueue ?: emptyList()) + tracks
+            return
+        }
+        val wasEmpty = queue.isEmpty()
+        queue = queue + tracks
+        current.addMediaItems(tracks.map(::mediaItemFor))
+        if (wasEmpty) {
+            current.prepare()
+            current.play()
+            queue.getOrNull(0)?.let { events.play(it, currentSurface) }
+        }
         publish()
     }
 
@@ -290,6 +322,12 @@ class Media3Player(
     }
 
     private fun uriFor(track: Track): Uri {
+        // Offline: prefer the downloaded file, keyed by stable remoteId so playback
+        // survives base-URL changes and works in airplane mode. streamUrl matching is
+        // a legacy fallback (O(N)); remoteId lookup is O(1).
+        track.remoteId?.let { rid ->
+            downloads.get(rid)?.let { d -> if (d.file().exists()) return d.uri() }
+        }
         downloads.localUriFor(track.streamUrl)?.let { return it }
         return Uri.parse(track.streamUrl.orEmpty())
     }

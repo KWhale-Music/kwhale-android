@@ -13,6 +13,7 @@ import androidx.media3.session.MediaSessionService
 import org.dueattendant149.vkx.MainActivity
 import org.dueattendant149.vkx.VkxApp
 
+@androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
@@ -22,7 +23,7 @@ class PlaybackService : MediaSessionService() {
         val app = application as VkxApp
         val httpFactory = AuthHttpDataSourceFactory(
             tokenProvider = { app.api.session()?.accessToken },
-            allowedHost = app.api.config.baseHost,
+            allowedHost = { app.api.config.baseHost },
         )
         val dataSourceFactory = DefaultDataSource.Factory(this, httpFactory)
         val exoPlayer = ExoPlayer.Builder(this)
