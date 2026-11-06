@@ -32,20 +32,26 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import org.dueattendant149.vkx.R
 import org.dueattendant149.vkx.VkxApp
-import org.dueattendant149.vkx.design.VkxThemeCatalog
+import org.dueattendant149.vkx.design.ThemeMode
 
 class PlayerWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as VkxApp
-        val theme = VkxThemeCatalog.byId(app.settings.themeId)
+        // App-consistent M3 palette (same derivation as VkxTheme) instead of the
+        // legacy VkxThemeCatalog, so the widget matches the in-app theme.
+        val dark = app.settings.themeMode != ThemeMode.LIGHT
+        val amoled = app.settings.themeMode == ThemeMode.AMOLED
+        val bg = if (!dark) 0xFFFFFFFF.toInt() else if (amoled) 0xFF000000.toInt() else 0xFF121212.toInt()
+        val textPrimary = if (!dark) 0xFF1B1C1E.toInt() else 0xFFE6E1E5.toInt()
+        val textSecondary = if (!dark) 0xFF49454F.toInt() else 0xFFCAC4D0.toInt()
         val state = app.player.state.value
         val track = state.current
         provideContent {
             Column(
                 modifier = GlanceModifier
                     .fillMaxSize()
-                    .background(Color(theme.bgPage.toInt()))
+                    .background(Color(bg))
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -66,7 +72,7 @@ class PlayerWidget : GlanceAppWidget() {
                             text = track?.title ?: "VK X",
                             maxLines = 1,
                             style = TextStyle(
-                                color = ColorProvider(Color(theme.textPrimary.toInt())),
+                                color = ColorProvider(Color(textPrimary)),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                             ),
@@ -76,7 +82,7 @@ class PlayerWidget : GlanceAppWidget() {
                             text = track?.artist ?: "Нет трека",
                             maxLines = 1,
                             style = TextStyle(
-                                color = ColorProvider(Color(theme.textSecondary.toInt())),
+                                color = ColorProvider(Color(textSecondary)),
                                 fontSize = 12.sp,
                             ),
                         )

@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +54,15 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val showAbout = remember { mutableStateOf(false) }
+    val notifPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        Toast.makeText(
+            context,
+            if (granted) "Уведомления включены" else "Уведомления отклонены",
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Настройки") },
@@ -71,19 +82,16 @@ fun SettingsScreen(
                 Toast.makeText(context, "Аккаунт управляется на сервере", Toast.LENGTH_SHORT).show()
             }
             SettingsRow("Оформление", Icons.Rounded.Palette, onAppearance)
-            SettingsRow("Воспроизведение", Icons.Rounded.PlayCircle) {
-                Toast.makeText(context, "Настройки воспроизведения скоро", Toast.LENGTH_SHORT).show()
-            }
             SettingsRow("Загрузки", Icons.Rounded.CloudDownload, onDownloads)
             SettingsRow("Уведомления", Icons.Rounded.Notifications) {
                 val granted = Build.VERSION.SDK_INT < 33 ||
                     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
                     PackageManager.PERMISSION_GRANTED
-                Toast.makeText(
-                    context,
-                    if (granted) "Уведомления включены" else "Уведомления отключены (разрешите в системе)",
-                    Toast.LENGTH_SHORT,
-                ).show()
+                if (granted) {
+                    Toast.makeText(context, "Уведомления включены", Toast.LENGTH_SHORT).show()
+                } else if (Build.VERSION.SDK_INT >= 33) {
+                    notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SettingsRow("История", Icons.Rounded.History, onHistory)
