@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="bg_page" format="color" />
+    <attr name="bg_primary" format="color" />
+    <attr name="global_accent" format="color" />
+    <attr name="nextdock_background" format="color" />
+    <attr name="scrim_color" format="color" />
+    <attr name="scrim_color_lighter" format="color" />
+    <attr name="text_inverse" format="color" />
+    <attr name="text_primary" format="color" />
+    <attr name="text_secondary" format="color" />
+</resources>

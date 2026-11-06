@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="google_black">#ff000000</color>
+    <color name="google_white">#ffffffff</color>
+    <color name="white">#ffffff</color>
+    <color name="vk_accent">#71AAEB</color>
+    <color name="vk_bg_dark">#121212</color>
+    <color name="vk_bg_primary_dark">#202020</color>
+    <color name="ic_launcher_background">#121212</color>
+</resources>

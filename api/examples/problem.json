@@ -1,0 +1,8 @@
+{
+  "type": "https://api.vkx.example/problems/not-found",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "Track not found",
+  "code": "track_not_found",
+  "instance": "/v1/tracks/track_404"
+}

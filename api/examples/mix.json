@@ -1,0 +1,11 @@
+{
+  "id": "mix_1",
+  "title": "Мой микс",
+  "subtitle": "Персональный",
+  "cover": { "id": "img_mix_1", "width": 600, "height": 600 },
+  "kind": "personal",
+  "trackCount": 50,
+  "isFollowed": false,
+  "createdAt": "2026-11-04T12:00:00Z",
+  "updatedAt": "2026-11-04T12:00:00Z"
+}

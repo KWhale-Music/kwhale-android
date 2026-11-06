@@ -1,0 +1,12 @@
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9.access",
+  "refreshToken": "rt_0f3b5a5e5f0e4d8a9a0e2f6b1d7c9a11",
+  "expiresIn": 900,
+  "tokenType": "Bearer",
+  "user": {
+    "id": "user_1",
+    "email": "demo@vkx.local",
+    "displayName": "Demo",
+    "createdAt": "2026-11-04T12:00:00Z"
+  }
+}

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/bg_page"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="72dp"
+        android:paddingBottom="32dp">
+
+        <TextView
+            android:id="@+id/auth_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/auth_title"
+            android:textColor="?attr/text_primary"
+            android:textSize="40sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/auth_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="@string/auth_subtitle"
+            android:textColor="?attr/text_secondary"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/auth_display_name"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="32dp"
+            android:background="@drawable/bg_search_field"
+            android:hint="@string/auth_display_name"
+            android:inputType="textPersonName"
+            android:paddingHorizontal="16dp"
+            android:singleLine="true"
+            android:textColor="?attr/text_primary"
+            android:textColorHint="?attr/text_secondary"
+            android:visibility="gone" />
+
+        <EditText
+            android:id="@+id/auth_invite"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_search_field"
+            android:hint="@string/auth_invite"
+            android:inputType="text"
+            android:paddingHorizontal="16dp"
+            android:singleLine="true"
+            android:textColor="?attr/text_primary"
+            android:textColorHint="?attr/text_secondary"
+            android:visibility="gone" />
+
+        <EditText
+            android:id="@+id/auth_email"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_search_field"
+            android:hint="@string/auth_email"
+            android:inputType="textEmailAddress"
+            android:paddingHorizontal="16dp"
+            android:singleLine="true"
+            android:textColor="?attr/text_primary"
+            android:textColorHint="?attr/text_secondary" />
+
+        <EditText
+            android:id="@+id/auth_password"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_search_field"
+            android:hint="@string/auth_password"
+            android:inputType="textPassword"
+            android:paddingHorizontal="16dp"
+            android:singleLine="true"
+            android:textColor="?attr/text_primary"
+            android:textColorHint="?attr/text_secondary" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/auth_submit"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="24dp"
+            android:text="@string/auth_login"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            app:cornerRadius="14dp" />
+
+        <ProgressBar
+            android:id="@+id/auth_progress"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginTop="16dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/auth_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:textColor="#E5484D"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/auth_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:padding="8dp"
+            android:text="@string/auth_toggle_register"
+            android:textColor="?attr/global_accent"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/auth_server_url"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:padding="8dp"
+            android:textColor="?attr/text_secondary"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

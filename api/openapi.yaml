@@ -1,0 +1,1485 @@
+openapi: 3.1.0
+info:
+  title: VKX Core API
+  version: 0.2.0
+  description: |
+    Единый API для приложения VKX Core.
+
+    Правило одного origin: клиент обращается только к `servers[0].url`.
+    Все URL в ответах — относительные пути; абсолютные внешние URL запрещены.
+    Аудио, обложки, тексты, рекомендации и загрузки идут через этот же API.
+
+    Контракт сокращён до реально используемых клиентом возможностей.
+    Радио, загрузка пользовательских обложек/аватаров и рекомендательный
+    движок исключены из этого этапа; рекомендации и миксы отдаются заглушками.
+servers:
+  - url: https://music.dueattendant149.org/v1
+    description: Production
+  - url: http://localhost:4010
+    description: Prism mock (local, paths without /v1; see api/mock/README.md)
+tags:
+  - name: Auth
+  - name: Me
+  - name: Home
+  - name: Search
+  - name: Tracks
+  - name: Albums
+  - name: Artists
+  - name: Playlists
+  - name: Library
+  - name: History
+  - name: Recommendations
+  - name: Mixes
+  - name: Events
+  - name: Uploads
+  - name: Images
+  - name: Config
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      security: []
+      summary: Регистрация по email/password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Созданный аккаунт
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      summary: Вход по email/password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Токены и профиль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refresh
+      security: []
+      summary: Обновление access-токена
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Новая пара токенов
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Отзыв refresh-токена
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LogoutRequest' }
+      responses:
+        '204': { description: Выход выполнен }
+
+  /me:
+    get:
+      tags: [Me]
+      operationId: getMe
+      responses:
+        '200':
+          description: Текущий профиль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Me]
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserUpdate' }
+      responses:
+        '200':
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /home:
+    get:
+      tags: [Home]
+      operationId: getHome
+      summary: Агрегированная главная (библиотека + заглушки рекомендаций)
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Секции главной
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HomeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /search:
+    get:
+      tags: [Search]
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, tracks, albums, artists, playlists, mixes]
+            default: all
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Результаты поиска
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /search/suggestions:
+    get:
+      tags: [Search]
+      operationId: searchSuggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        '200':
+          description: Подсказки
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Suggestions' }
+
+  /search/history:
+    get:
+      tags: [Search]
+      operationId: getSearchHistory
+      responses:
+        '200':
+          description: История поиска
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchHistory' }
+    delete:
+      tags: [Search]
+      operationId: clearSearchHistory
+      responses:
+        '204': { description: История очищена }
+
+  /tracks/{trackId}:
+    get:
+      tags: [Tracks]
+      operationId: getTrack
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '200':
+          description: Трек
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Track' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tracks/{trackId}/stream:
+    get:
+      tags: [Tracks]
+      operationId: streamTrack
+      summary: Аудиопоток. Только этот origin, без redirect на внешний CDN.
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+        - name: Range
+          in: header
+          required: false
+          schema: { type: string, example: bytes=0-1023 }
+      responses:
+        '200':
+          description: Аудио
+          headers:
+            Accept-Ranges: { schema: { type: string, example: bytes } }
+            Cache-Control: { schema: { type: string, example: private, max-age=0 } }
+          content:
+            audio/mpeg:
+              schema: { type: string, format: binary }
+            audio/mp4:
+              schema: { type: string, format: binary }
+            audio/ogg:
+              schema: { type: string, format: binary }
+            audio/flac:
+              schema: { type: string, format: binary }
+        '206':
+          description: Частичное содержимое (Range)
+          content:
+            audio/mpeg:
+              schema: { type: string, format: binary }
+            audio/mp4:
+              schema: { type: string, format: binary }
+            audio/ogg:
+              schema: { type: string, format: binary }
+            audio/flac:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tracks/{trackId}/download:
+    get:
+      tags: [Tracks]
+      operationId: downloadTrack
+      summary: Скачивание аудио. Тот же origin, всегда байты файла.
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '200':
+          description: Файл
+          headers:
+            Content-Disposition:
+              schema: { type: string, example: attachment; filename="track.mp3" }
+          content:
+            audio/mpeg:
+              schema: { type: string, format: binary }
+            audio/mp4:
+              schema: { type: string, format: binary }
+            audio/ogg:
+              schema: { type: string, format: binary }
+            audio/flac:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tracks/{trackId}/lyrics:
+    get:
+      tags: [Tracks]
+      operationId: getLyrics
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '200':
+          description: Текст трека
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lyrics' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tracks/{trackId}/like:
+    put:
+      tags: [Tracks]
+      operationId: likeTrack
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '204': { description: Лайк поставлен }
+    delete:
+      tags: [Tracks]
+      operationId: unlikeTrack
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '204': { description: Лайк снят }
+
+  /tracks/{trackId}/dislike:
+    put:
+      tags: [Tracks]
+      operationId: dislikeTrack
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '204': { description: Дизлайк поставлен }
+    delete:
+      tags: [Tracks]
+      operationId: undislikeTrack
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '204': { description: Дизлайк снят }
+
+  /albums/{albumId}:
+    get:
+      tags: [Albums]
+      operationId: getAlbum
+      parameters:
+        - { $ref: '#/components/parameters/AlbumId' }
+      responses:
+        '200':
+          description: Альбом (с треклистом, если доступен)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /albums/{albumId}/tracks:
+    get:
+      tags: [Albums]
+      operationId: getAlbumTracks
+      parameters:
+        - { $ref: '#/components/parameters/AlbumId' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Треки альбома
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TracksPage' }
+
+  /artists/{artistId}:
+    get:
+      tags: [Artists]
+      operationId: getArtist
+      parameters:
+        - { $ref: '#/components/parameters/ArtistId' }
+      responses:
+        '200':
+          description: Артист (с альбомами и топ-треками, если доступны)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Artist' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /artists/{artistId}/albums:
+    get:
+      tags: [Artists]
+      operationId: getArtistAlbums
+      parameters:
+        - { $ref: '#/components/parameters/ArtistId' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Альбомы артиста
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlbumsPage' }
+
+  /artists/{artistId}/top-tracks:
+    get:
+      tags: [Artists]
+      operationId: getArtistTopTracks
+      parameters:
+        - { $ref: '#/components/parameters/ArtistId' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Топ треков
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TracksPage' }
+
+  /playlists:
+    get:
+      tags: [Playlists]
+      operationId: listPlaylists
+      parameters:
+        - name: owner
+          in: query
+          schema: { type: string, enum: [me, all], default: me }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Плейлисты
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlaylistsPage' }
+    post:
+      tags: [Playlists]
+      operationId: createPlaylist
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaylistCreate' }
+      responses:
+        '201':
+          description: Созданный плейлист
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Playlist' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /playlists/{playlistId}:
+    get:
+      tags: [Playlists]
+      operationId: getPlaylist
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+      responses:
+        '200':
+          description: Плейлист (с треками, если доступны)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Playlist' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Playlists]
+      operationId: updatePlaylist
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaylistUpdate' }
+      responses:
+        '200':
+          description: Обновлённый плейлист
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Playlist' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Playlists]
+      operationId: deletePlaylist
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+      responses:
+        '204': { description: Удалён }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /playlists/{playlistId}/tracks:
+    get:
+      tags: [Playlists]
+      operationId: getPlaylistTracks
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Треки плейлиста
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TracksPage' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Playlists]
+      operationId: addPlaylistTracks
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaylistTracksAdd' }
+      responses:
+        '200':
+          description: Обновлённый плейлист
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Playlist' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /playlists/{playlistId}/tracks/{trackId}:
+    delete:
+      tags: [Playlists]
+      operationId: removePlaylistTrack
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '204': { description: Удалён из плейлиста }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /playlists/{playlistId}/tracks/order:
+    put:
+      tags: [Playlists]
+      operationId: reorderPlaylistTracks
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaylistReorder' }
+      responses:
+        '200':
+          description: Обновлённый плейлист
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Playlist' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /playlists/{playlistId}/follow:
+    put:
+      tags: [Playlists]
+      operationId: followPlaylist
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+      responses:
+        '204': { description: Подписка оформлена }
+    delete:
+      tags: [Playlists]
+      operationId: unfollowPlaylist
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+      responses:
+        '204': { description: Подписка снята }
+
+  /albums/{albumId}/tracks/like:
+    put:
+      tags: [Albums]
+      operationId: likeAlbumTracks
+      summary: Поставить лайк всем трекам альбома (идемпотентно)
+      parameters:
+        - { $ref: '#/components/parameters/AlbumId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '202':
+          description: Лайки приняты
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LikeAllResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /playlists/{playlistId}/tracks/like:
+    put:
+      tags: [Playlists]
+      operationId: likePlaylistTracks
+      summary: Поставить лайк всем трекам плейлиста (идемпотентно)
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '202':
+          description: Лайки приняты
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LikeAllResult' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /library/tracks:
+    get:
+      tags: [Library]
+      operationId: libraryTracks
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [default, title, artist, added], default: default }
+      responses:
+        '200':
+          description: Лайкнутые треки
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TracksPage' }
+
+  /library/playlists:
+    get:
+      tags: [Library]
+      operationId: libraryPlaylists
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Плейлисты в библиотеке
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlaylistsPage' }
+
+  /history:
+    get:
+      tags: [History]
+      operationId: getHistory
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: История прослушиваний
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HistoryPage' }
+    delete:
+      tags: [History]
+      operationId: clearHistory
+      responses:
+        '204': { description: История очищена }
+
+  /recommendations/top-artists:
+    get:
+      tags: [Recommendations]
+      operationId: recommendationsTopArtists
+      parameters:
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Топ артистов (заглушка до рекомендательного модуля)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArtistsPage' }
+
+  /recommendations/genres:
+    get:
+      tags: [Recommendations]
+      operationId: recommendationsGenres
+      responses:
+        '200':
+          description: Жанры
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenresResponse' }
+
+  /recommendations/onboarding:
+    get:
+      tags: [Recommendations]
+      operationId: getOnboarding
+      responses:
+        '200':
+          description: Текущие предпочтения (заглушка до рекомендательного модуля)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Onboarding' }
+    put:
+      tags: [Recommendations]
+      operationId: updateOnboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Onboarding' }
+      responses:
+        '204': { description: Сохранено }
+
+  /mixes:
+    get:
+      tags: [Mixes]
+      operationId: listMixes
+      summary: Персональные миксы (заглушка до рекомендательного модуля)
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string, enum: [personal], default: personal }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Миксы
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MixesPage' }
+
+  /mixes/{mixId}/tracks:
+    get:
+      tags: [Mixes]
+      operationId: getMixTracks
+      summary: Очередь микса (заглушка до рекомендательного модуля)
+      parameters:
+        - { $ref: '#/components/parameters/MixId' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Очередь микса
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackRecommendationsPage' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /uploads/tracks:
+    post:
+      tags: [Uploads]
+      operationId: uploadTrack
+      summary: Загрузка собственного аудиофайла в общую библиотеку
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                title: { type: string }
+                artist: { type: string }
+                album: { type: string }
+      responses:
+        '201':
+          description: Загруженный и распознанный трек
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Track' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413':
+          description: Файл слишком большой
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: Не удалось распознать метаданные
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /events:
+    post:
+      tags: [Events]
+      operationId: sendEvents
+      summary: Батч сигналов для рекомендаций/аналитики
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventBatch' }
+      responses:
+        '202': { description: Принято }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /images/{imageId}:
+    get:
+      tags: [Images]
+      operationId: getImage
+      security: []
+      parameters:
+        - name: imageId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: size
+          in: query
+          schema:
+            type: string
+            enum: [xs, sm, md, lg, original]
+            default: md
+      responses:
+        '200':
+          description: Изображение
+          headers:
+            Cache-Control: { schema: { type: string, example: public, max-age=31536000, immutable } }
+            ETag: { schema: { type: string } }
+          content:
+            image/webp:
+              schema: { type: string, format: binary }
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+        '304': { description: Not Modified }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /config:
+    get:
+      tags: [Config]
+      operationId: getConfig
+      responses:
+        '200':
+          description: Конфигурация клиента
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Config' }
+
+  /health:
+    get:
+      tags: [Config]
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: Сервис жив
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    TrackId:
+      name: trackId
+      in: path
+      required: true
+      schema: { type: string }
+    AlbumId:
+      name: albumId
+      in: path
+      required: true
+      schema: { type: string }
+    ArtistId:
+      name: artistId
+      in: path
+      required: true
+      schema: { type: string }
+    PlaylistId:
+      name: playlistId
+      in: path
+      required: true
+      schema: { type: string }
+    MixId:
+      name: mixId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Требуется авторизация
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Нет доступа
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Не найдено
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Конфликт
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: Слишком много запросов
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, example: https://api.vkx.example/problems/validation }
+        title: { type: string, example: Validation failed }
+        status: { type: integer, example: 400 }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, example: validation_failed }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName, inviteToken]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        inviteToken: { type: string }
+        deviceId: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+        deviceId: { type: string }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    LogoutRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    AuthResponse:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, tokenType, user]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, description: seconds, example: 900 }
+        tokenType: { type: string, example: Bearer }
+        user: { $ref: '#/components/schemas/User' }
+
+    User:
+      type: object
+      required: [id, displayName, avatar]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        avatar: { $ref: '#/components/schemas/ImageRef' }
+        createdAt: { type: string, format: date-time }
+
+    UserUpdate:
+      type: object
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+
+    UserRef:
+      type: object
+      required: [id, displayName, avatar]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        avatar: { $ref: '#/components/schemas/ImageRef' }
+
+    ImageRef:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        blurHash: { type: string }
+
+    ArtistRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+
+    AlbumRef:
+      type: object
+      required: [id, title, cover]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        cover: { $ref: '#/components/schemas/ImageRef' }
+
+    Genre:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        image: { $ref: '#/components/schemas/ImageRef' }
+
+    Track:
+      type: object
+      required: [id, title, artists, durationMs, explicit, cover, isLiked, isDisliked, hasLyrics, isDownloaded, downloadStatus]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        artists:
+          type: array
+          items: { $ref: '#/components/schemas/ArtistRef' }
+        album: { $ref: '#/components/schemas/AlbumRef' }
+        durationMs: { type: integer, format: int64 }
+        explicit: { type: boolean }
+        cover: { $ref: '#/components/schemas/ImageRef' }
+        genre: { $ref: '#/components/schemas/Genre' }
+        year: { type: integer }
+        trackNumber: { type: integer }
+        discNumber: { type: integer }
+        isLiked: { type: boolean }
+        isDisliked: { type: boolean }
+        hasLyrics: { type: boolean }
+        isDownloaded: { type: boolean }
+        downloadStatus: { type: string, enum: [pending, downloading, ready, failed] }
+        previewAvailable: { type: boolean }
+        playCount: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+
+    Album:
+      type: object
+      required: [id, title, artists, cover, trackCount, explicit]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        artists:
+          type: array
+          items: { $ref: '#/components/schemas/ArtistRef' }
+        cover: { $ref: '#/components/schemas/ImageRef' }
+        year: { type: integer }
+        trackCount: { type: integer }
+        type: { type: string, enum: [album, single, ep, compilation, live] }
+        explicit: { type: boolean }
+        tracks:
+          type: array
+          items: { $ref: '#/components/schemas/Track' }
+        createdAt: { type: string, format: date-time }
+
+    Artist:
+      type: object
+      required: [id, name, avatar, genres, followers]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        avatar: { $ref: '#/components/schemas/ImageRef' }
+        bio: { type: string }
+        genres:
+          type: array
+          items: { $ref: '#/components/schemas/Genre' }
+        followers: { type: integer, format: int64 }
+        albumCount: { type: integer }
+        topTracks:
+          type: array
+          items: { $ref: '#/components/schemas/Track' }
+        albums:
+          type: array
+          items: { $ref: '#/components/schemas/Album' }
+
+    Playlist:
+      type: object
+      required: [id, title, owner, cover, trackCount, visibility, isSystem, permissions, updatedAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        owner: { $ref: '#/components/schemas/UserRef' }
+        cover: { $ref: '#/components/schemas/ImageRef' }
+        trackCount: { type: integer }
+        visibility: { type: string, enum: [private, unlisted, public] }
+        isSystem: { type: boolean }
+        isFollowed: { type: boolean }
+        permissions:
+          type: object
+          required: [canEdit, canDelete, canAddTracks]
+          properties:
+            canEdit: { type: boolean }
+            canDelete: { type: boolean }
+            canAddTracks: { type: boolean }
+        tracks:
+          type: array
+          items: { $ref: '#/components/schemas/Track' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    PlaylistCreate:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 1000 }
+        visibility: { type: string, enum: [private, unlisted, public], default: private }
+
+    PlaylistUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 1000 }
+        visibility: { type: string, enum: [private, unlisted, public] }
+
+    PlaylistTracksAdd:
+      type: object
+      required: [trackIds]
+      properties:
+        trackIds:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items: { type: string }
+        position: { type: integer, minimum: 0 }
+
+    PlaylistReorder:
+      type: object
+      required: [trackIds]
+      properties:
+        trackIds:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { type: string }
+
+    LikeAllResult:
+      type: object
+      required: [requested, liked, alreadyLiked, queued, failed]
+      properties:
+        requested: { type: integer }
+        liked: { type: integer }
+        alreadyLiked: { type: integer }
+        queued: { type: integer }
+        failed: { type: integer }
+
+    TrackRecommendation:
+      type: object
+      required: [track]
+      properties:
+        track: { $ref: '#/components/schemas/Track' }
+        reason: { type: string }
+        score: { type: number, minimum: 0, maximum: 1 }
+
+    TrackRecommendationsPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TrackRecommendation' }
+        nextCursor: { type: string }
+
+    TracksPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Track' }
+        nextCursor: { type: string }
+
+    AlbumsPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Album' }
+        nextCursor: { type: string }
+
+    ArtistsPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Artist' }
+        nextCursor: { type: string }
+
+    PlaylistsPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Playlist' }
+        nextCursor: { type: string }
+
+    MixesPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Mix' }
+        nextCursor: { type: string }
+
+    GenresResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Genre' }
+
+    HistoryEntry:
+      type: object
+      required: [track, playedAt]
+      properties:
+        track: { $ref: '#/components/schemas/Track' }
+        playedAt: { type: string, format: date-time }
+        context: { type: string }
+
+    HistoryPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/HistoryEntry' }
+        nextCursor: { type: string }
+
+    SearchResponse:
+      type: object
+      required: [query, tracks, albums, artists, playlists, total]
+      properties:
+        query: { type: string }
+        tracks:
+          type: array
+          items: { $ref: '#/components/schemas/Track' }
+        albums:
+          type: array
+          items: { $ref: '#/components/schemas/Album' }
+        artists:
+          type: array
+          items: { $ref: '#/components/schemas/Artist' }
+        playlists:
+          type: array
+          items: { $ref: '#/components/schemas/Playlist' }
+        mixes:
+          type: array
+          items: { $ref: '#/components/schemas/Mix' }
+        total: { type: integer }
+
+    Suggestion:
+      type: object
+      required: [text, type]
+      properties:
+        text: { type: string }
+        type: { type: string, enum: [query, artist, track, album, playlist] }
+
+    Suggestions:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Suggestion' }
+
+    SearchHistory:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { type: string }
+
+    LyricsLine:
+      type: object
+      required: [startMs, text]
+      properties:
+        startMs: { type: integer, format: int64 }
+        endMs: { type: integer, format: int64 }
+        text: { type: string }
+
+    Lyrics:
+      type: object
+      required: [trackId, provider, language, hasTimestamps]
+      properties:
+        trackId: { type: string }
+        provider: { type: string, example: internal }
+        language: { type: string, example: ru }
+        plain: { type: string }
+        synced:
+          type: array
+          items: { $ref: '#/components/schemas/LyricsLine' }
+        hasTimestamps: { type: boolean }
+
+    SeedRef:
+      type: object
+      required: [type, id]
+      properties:
+        type: { type: string, enum: [track, artist, album, playlist, genre] }
+        id: { type: string }
+
+    Mix:
+      type: object
+      required: [id, title, cover, kind, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+        cover: { $ref: '#/components/schemas/ImageRef' }
+        kind: { type: string, enum: [personal, track, artist, album, playlist, genre, chart] }
+        seed: { $ref: '#/components/schemas/SeedRef' }
+        trackCount: { type: integer }
+        isFollowed: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Onboarding:
+      type: object
+      required: [genres, artists]
+      properties:
+        genres:
+          type: array
+          items: { $ref: '#/components/schemas/Genre' }
+        artists:
+          type: array
+          items: { $ref: '#/components/schemas/ArtistRef' }
+
+    Banner:
+      type: object
+      required: [id, title, image]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+        image: { $ref: '#/components/schemas/ImageRef' }
+        action: { type: string }
+
+    HomeAction:
+      type: object
+      required: [id, title, action]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+        icon: { type: string }
+        action: { type: string }
+
+    HomeItem:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [track, album, artist, playlist, mix, banner, action]
+        track: { $ref: '#/components/schemas/Track' }
+        album: { $ref: '#/components/schemas/Album' }
+        artist: { $ref: '#/components/schemas/Artist' }
+        playlist: { $ref: '#/components/schemas/Playlist' }
+        mix: { $ref: '#/components/schemas/Mix' }
+        banner: { $ref: '#/components/schemas/Banner' }
+        action: { $ref: '#/components/schemas/HomeAction' }
+
+    HomeSection:
+      type: object
+      required: [id, kind, layout, items]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+        kind:
+          type: string
+          enum: [banner, actions, shelf, list, recommendation, mix, chart, new-release]
+        layout:
+          type: string
+          enum: [carousel, grid, list, banner, actions]
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/HomeItem' }
+        seeAll: { type: boolean }
+        nextCursor: { type: string }
+
+    HomeResponse:
+      type: object
+      required: [sections]
+      properties:
+        sections:
+          type: array
+          items: { $ref: '#/components/schemas/HomeSection' }
+
+    EventContext:
+      type: object
+      properties:
+        source: { type: string, enum: [home, search, library, mix, playlist, artist, album] }
+        mixId: { type: string }
+        playlistId: { type: string }
+
+    Event:
+      type: object
+      required: [id, type, occurredAt]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum:
+            [play, pause, resume, seek, skip, complete, repeat, like, unlike, dislike,
+             undislike, impression, click, add_to_playlist, remove_from_playlist, download, search]
+        trackId: { type: string }
+        playbackId: { type: string }
+        context: { $ref: '#/components/schemas/EventContext' }
+        positionMs: { type: integer, format: int64 }
+        listenedMs: { type: integer, format: int64 }
+        trackDurationMs: { type: integer, format: int64 }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        timezoneOffsetMinutes: { type: integer }
+        surface:
+          type: string
+          enum: [home, search, library, mix, playlist, artist, album, player]
+        sessionId: { type: string }
+        deviceId: { type: string }
+        query: { type: string }
+        resultCount: { type: integer }
+        clickedPosition: { type: integer }
+        occurredAt: { type: string, format: date-time }
+
+    EventBatch:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/Event' }
+
+    Config:
+      type: object
+      required: [apiVersion, minClientVersion, features, limits]
+      properties:
+        apiVersion: { type: string, example: 1.0 }
+        minClientVersion: { type: string, example: 1.0.0 }
+        features:
+          type: object
+          properties:
+            recommendations: { type: boolean }
+            lyrics: { type: boolean }
+            downloads: { type: boolean }
+            playlists: { type: boolean }
+            offline: { type: boolean }
+        limits:
+          type: object
+          properties:
+            maxPlaylistTracks: { type: integer }
+            maxUploadBytes: { type: integer }
+            eventBatchSize: { type: integer }
+        media:
+          type: object
+          properties:
+            supportedFormats:
+              type: array
+              items: { type: string }
+            streamChunkSize: { type: integer }

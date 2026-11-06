@@ -1,0 +1,743 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="VkxCatalogTheme_0" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#121212</item>
+        <item name="bg_primary">#202020</item>
+        <item name="nextdock_background">#121212</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#71AAEB</item>
+        <item name="colorAccent">#71AAEB</item>
+        <item name="android:colorAccent">#71AAEB</item>
+        <item name="colorSecondary">#71AAEB</item>
+        <item name="colorSurface">#121212</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#121212</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_1" parent="Theme.Vkx.Light">
+        <item name="bg_page">#FFFFFF</item>
+        <item name="bg_primary">#F0F0F0</item>
+        <item name="nextdock_background">#FFFFFF</item>
+        <item name="text_primary">#111111</item>
+        <item name="text_secondary">#6B6B70</item>
+        <item name="colorPrimary">#5181B1</item>
+        <item name="colorAccent">#5181B1</item>
+        <item name="android:colorAccent">#5181B1</item>
+        <item name="colorSecondary">#5181B1</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnSurface">#111111</item>
+        <item name="colorOnSurfaceVariant">#6B6B70</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:textColorPrimary">#111111</item>
+        <item name="android:textColorSecondary">#6B6B70</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="VkxCatalogTheme_2" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#000000</item>
+        <item name="bg_primary">#121212</item>
+        <item name="nextdock_background">#000000</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#71AAEB</item>
+        <item name="colorAccent">#71AAEB</item>
+        <item name="android:colorAccent">#71AAEB</item>
+        <item name="colorSecondary">#71AAEB</item>
+        <item name="colorSurface">#000000</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#000000</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_3" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#151D26</item>
+        <item name="bg_primary">#1C2733</item>
+        <item name="nextdock_background">#1C2733</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#61A7E0</item>
+        <item name="colorAccent">#61A7E0</item>
+        <item name="android:colorAccent">#61A7E0</item>
+        <item name="colorSecondary">#61A7E0</item>
+        <item name="colorSurface">#151D26</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#151D26</item>
+        <item name="android:windowBackground">#151D26</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_4" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#000131</item>
+        <item name="bg_primary">#000127</item>
+        <item name="nextdock_background">#000127</item>
+        <item name="text_primary">#F6C894</item>
+        <item name="text_secondary">#F6C894</item>
+        <item name="colorPrimary">#E1637E</item>
+        <item name="colorAccent">#E1637E</item>
+        <item name="android:colorAccent">#E1637E</item>
+        <item name="colorSecondary">#E1637E</item>
+        <item name="colorSurface">#000131</item>
+        <item name="colorOnSurface">#F6C894</item>
+        <item name="colorOnSurfaceVariant">#F6C894</item>
+        <item name="android:colorBackground">#000131</item>
+        <item name="android:windowBackground">#000131</item>
+        <item name="android:textColorPrimary">#F6C894</item>
+        <item name="android:textColorSecondary">#F6C894</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_5" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#18191B</item>
+        <item name="bg_primary">#1C1D1F</item>
+        <item name="nextdock_background">#1C1D1F</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#FF00FF</item>
+        <item name="colorAccent">#FF00FF</item>
+        <item name="android:colorAccent">#FF00FF</item>
+        <item name="colorSecondary">#FF00FF</item>
+        <item name="colorSurface">#18191B</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#18191B</item>
+        <item name="android:windowBackground">#18191B</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_6" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#212735</item>
+        <item name="bg_primary">#212735</item>
+        <item name="nextdock_background">#212735</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#E52C5F</item>
+        <item name="colorAccent">#E52C5F</item>
+        <item name="android:colorAccent">#E52C5F</item>
+        <item name="colorSecondary">#E52C5F</item>
+        <item name="colorSurface">#212735</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#212735</item>
+        <item name="android:windowBackground">#212735</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_7" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#242038</item>
+        <item name="bg_primary">#332D4F</item>
+        <item name="nextdock_background">#332D4F</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#21EF8B</item>
+        <item name="colorAccent">#21EF8B</item>
+        <item name="android:colorAccent">#21EF8B</item>
+        <item name="colorSecondary">#21EF8B</item>
+        <item name="colorSurface">#242038</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#242038</item>
+        <item name="android:windowBackground">#242038</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_8" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#131722</item>
+        <item name="bg_primary">#19212E</item>
+        <item name="nextdock_background">#19212E</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#AB0000</item>
+        <item name="colorAccent">#AB0000</item>
+        <item name="android:colorAccent">#AB0000</item>
+        <item name="colorSecondary">#AB0000</item>
+        <item name="colorSurface">#131722</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#131722</item>
+        <item name="android:windowBackground">#131722</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_9" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#201148</item>
+        <item name="bg_primary">#201148</item>
+        <item name="nextdock_background">#201148</item>
+        <item name="text_primary">#55E7FF</item>
+        <item name="text_secondary">#55E7FF</item>
+        <item name="colorPrimary">#FF34B3</item>
+        <item name="colorAccent">#FF34B3</item>
+        <item name="android:colorAccent">#FF34B3</item>
+        <item name="colorSecondary">#FF34B3</item>
+        <item name="colorSurface">#201148</item>
+        <item name="colorOnSurface">#55E7FF</item>
+        <item name="colorOnSurfaceVariant">#55E7FF</item>
+        <item name="android:colorBackground">#201148</item>
+        <item name="android:windowBackground">#201148</item>
+        <item name="android:textColorPrimary">#55E7FF</item>
+        <item name="android:textColorSecondary">#55E7FF</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_10" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#191522</item>
+        <item name="bg_primary">#191522</item>
+        <item name="nextdock_background">#191522</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#9085FF</item>
+        <item name="colorAccent">#9085FF</item>
+        <item name="android:colorAccent">#9085FF</item>
+        <item name="colorSecondary">#9085FF</item>
+        <item name="colorSurface">#191522</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#191522</item>
+        <item name="android:windowBackground">#191522</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_11" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#19191A</item>
+        <item name="bg_primary">#2C2D2E</item>
+        <item name="nextdock_background">#2C2D2E</item>
+        <item name="text_primary">#E1E3E6</item>
+        <item name="text_secondary">#76787A</item>
+        <item name="colorPrimary">#71AAEB</item>
+        <item name="colorAccent">#71AAEB</item>
+        <item name="android:colorAccent">#71AAEB</item>
+        <item name="colorSecondary">#71AAEB</item>
+        <item name="colorSurface">#19191A</item>
+        <item name="colorOnSurface">#E1E3E6</item>
+        <item name="colorOnSurfaceVariant">#76787A</item>
+        <item name="android:colorBackground">#19191A</item>
+        <item name="android:windowBackground">#19191A</item>
+        <item name="android:textColorPrimary">#E1E3E6</item>
+        <item name="android:textColorSecondary">#76787A</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_12" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#202832</item>
+        <item name="bg_primary">#202832</item>
+        <item name="nextdock_background">#202832</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#FFA741</item>
+        <item name="colorAccent">#FFA741</item>
+        <item name="android:colorAccent">#FFA741</item>
+        <item name="colorSecondary">#FFA741</item>
+        <item name="colorSurface">#202832</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#202832</item>
+        <item name="android:windowBackground">#202832</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_13" parent="Theme.Vkx.Light">
+        <item name="bg_page">#FDF6E3</item>
+        <item name="bg_primary">#EEE8D5</item>
+        <item name="nextdock_background">#EEE8D5</item>
+        <item name="text_primary">#586E75</item>
+        <item name="text_secondary">#93A1A1</item>
+        <item name="colorPrimary">#CB4B16</item>
+        <item name="colorAccent">#CB4B16</item>
+        <item name="android:colorAccent">#CB4B16</item>
+        <item name="colorSecondary">#CB4B16</item>
+        <item name="colorSurface">#FDF6E3</item>
+        <item name="colorOnSurface">#586E75</item>
+        <item name="colorOnSurfaceVariant">#93A1A1</item>
+        <item name="android:colorBackground">#FDF6E3</item>
+        <item name="android:windowBackground">#FDF6E3</item>
+        <item name="android:textColorPrimary">#586E75</item>
+        <item name="android:textColorSecondary">#93A1A1</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="VkxCatalogTheme_14" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#002B36</item>
+        <item name="bg_primary">#073642</item>
+        <item name="nextdock_background">#073642</item>
+        <item name="text_primary">#839496</item>
+        <item name="text_secondary">#586E75</item>
+        <item name="colorPrimary">#2AA198</item>
+        <item name="colorAccent">#2AA198</item>
+        <item name="android:colorAccent">#2AA198</item>
+        <item name="colorSecondary">#2AA198</item>
+        <item name="colorSurface">#002B36</item>
+        <item name="colorOnSurface">#839496</item>
+        <item name="colorOnSurfaceVariant">#586E75</item>
+        <item name="android:colorBackground">#002B36</item>
+        <item name="android:windowBackground">#002B36</item>
+        <item name="android:textColorPrimary">#839496</item>
+        <item name="android:textColorSecondary">#586E75</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_15" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#21263A</item>
+        <item name="bg_primary">#2B2F48</item>
+        <item name="nextdock_background">#2B2F48</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#FFA741</item>
+        <item name="colorAccent">#FFA741</item>
+        <item name="android:colorAccent">#FFA741</item>
+        <item name="colorSecondary">#FFA741</item>
+        <item name="colorSurface">#21263A</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#21263A</item>
+        <item name="android:windowBackground">#21263A</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_16" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#001B12</item>
+        <item name="bg_primary">#142C24</item>
+        <item name="nextdock_background">#142C24</item>
+        <item name="text_primary">#D0E0CF</item>
+        <item name="text_secondary">#667670</item>
+        <item name="colorPrimary">#299A8B</item>
+        <item name="colorAccent">#299A8B</item>
+        <item name="android:colorAccent">#299A8B</item>
+        <item name="colorSecondary">#299A8B</item>
+        <item name="colorSurface">#001B12</item>
+        <item name="colorOnSurface">#D0E0CF</item>
+        <item name="colorOnSurfaceVariant">#667670</item>
+        <item name="android:colorBackground">#001B12</item>
+        <item name="android:windowBackground">#001B12</item>
+        <item name="android:textColorPrimary">#D0E0CF</item>
+        <item name="android:textColorSecondary">#667670</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_17" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#9600FF</item>
+        <item name="bg_primary">#9600FF</item>
+        <item name="nextdock_background">#9600FF</item>
+        <item name="text_primary">#00FF00</item>
+        <item name="text_secondary">#00FF00</item>
+        <item name="colorPrimary">#00FF00</item>
+        <item name="colorAccent">#00FF00</item>
+        <item name="android:colorAccent">#00FF00</item>
+        <item name="colorSecondary">#00FF00</item>
+        <item name="colorSurface">#9600FF</item>
+        <item name="colorOnSurface">#00FF00</item>
+        <item name="colorOnSurfaceVariant">#00FF00</item>
+        <item name="android:colorBackground">#9600FF</item>
+        <item name="android:windowBackground">#9600FF</item>
+        <item name="android:textColorPrimary">#00FF00</item>
+        <item name="android:textColorSecondary">#00FF00</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_18" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#3C3C3C</item>
+        <item name="bg_primary">#3C3C3C</item>
+        <item name="nextdock_background">#3C3C3C</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#E16364</item>
+        <item name="colorAccent">#E16364</item>
+        <item name="android:colorAccent">#E16364</item>
+        <item name="colorSecondary">#E16364</item>
+        <item name="colorSurface">#3C3C3C</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#3C3C3C</item>
+        <item name="android:windowBackground">#3C3C3C</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_19" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#2C001E</item>
+        <item name="bg_primary">#2D132C</item>
+        <item name="nextdock_background">#2D132C</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#AEA79F</item>
+        <item name="colorPrimary">#E95420</item>
+        <item name="colorAccent">#E95420</item>
+        <item name="android:colorAccent">#E95420</item>
+        <item name="colorSecondary">#E95420</item>
+        <item name="colorSurface">#2C001E</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#AEA79F</item>
+        <item name="android:colorBackground">#2C001E</item>
+        <item name="android:windowBackground">#2C001E</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#AEA79F</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_20" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#20232F</item>
+        <item name="bg_primary">#2A2D39</item>
+        <item name="nextdock_background">#20232F</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#7F818F</item>
+        <item name="colorPrimary">#319DE6</item>
+        <item name="colorAccent">#319DE6</item>
+        <item name="android:colorAccent">#319DE6</item>
+        <item name="colorSecondary">#319DE6</item>
+        <item name="colorSurface">#20232F</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#7F818F</item>
+        <item name="android:colorBackground">#20232F</item>
+        <item name="android:windowBackground">#20232F</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#7F818F</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_21" parent="Theme.Vkx.Light">
+        <item name="bg_page">#FDFAF0</item>
+        <item name="bg_primary">#F4EFE5</item>
+        <item name="nextdock_background">#FDFAF0</item>
+        <item name="text_primary">#4E312F</item>
+        <item name="text_secondary">#AB9F94</item>
+        <item name="colorPrimary">#FE822F</item>
+        <item name="colorAccent">#FE822F</item>
+        <item name="android:colorAccent">#FE822F</item>
+        <item name="colorSecondary">#FE822F</item>
+        <item name="colorSurface">#FDFAF0</item>
+        <item name="colorOnSurface">#4E312F</item>
+        <item name="colorOnSurfaceVariant">#AB9F94</item>
+        <item name="android:colorBackground">#FDFAF0</item>
+        <item name="android:windowBackground">#FDFAF0</item>
+        <item name="android:textColorPrimary">#4E312F</item>
+        <item name="android:textColorSecondary">#AB9F94</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="VkxCatalogTheme_22" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#323641</item>
+        <item name="bg_primary">#323641</item>
+        <item name="nextdock_background">#323641</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#FFBCBC</item>
+        <item name="colorAccent">#FFBCBC</item>
+        <item name="android:colorAccent">#FFBCBC</item>
+        <item name="colorSecondary">#FFBCBC</item>
+        <item name="colorSurface">#323641</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#323641</item>
+        <item name="android:windowBackground">#323641</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_23" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#370051</item>
+        <item name="bg_primary">#370051</item>
+        <item name="nextdock_background">#370051</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#FD7492</item>
+        <item name="colorAccent">#FD7492</item>
+        <item name="android:colorAccent">#FD7492</item>
+        <item name="colorSecondary">#FD7492</item>
+        <item name="colorSurface">#370051</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#370051</item>
+        <item name="android:windowBackground">#370051</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_24" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#282828</item>
+        <item name="bg_primary">#121212</item>
+        <item name="nextdock_background">#282828</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#1DB954</item>
+        <item name="colorAccent">#1DB954</item>
+        <item name="android:colorAccent">#1DB954</item>
+        <item name="colorSecondary">#1DB954</item>
+        <item name="colorSurface">#282828</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#282828</item>
+        <item name="android:windowBackground">#282828</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_25" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#313745</item>
+        <item name="bg_primary">#212735</item>
+        <item name="nextdock_background">#313745</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#00A273</item>
+        <item name="colorAccent">#00A273</item>
+        <item name="android:colorAccent">#00A273</item>
+        <item name="colorSecondary">#00A273</item>
+        <item name="colorSurface">#313745</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#313745</item>
+        <item name="android:windowBackground">#313745</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_26" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#0F101E</item>
+        <item name="bg_primary">#181929</item>
+        <item name="nextdock_background">#0F101E</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#FF6088</item>
+        <item name="colorAccent">#FF6088</item>
+        <item name="android:colorAccent">#FF6088</item>
+        <item name="colorSecondary">#FF6088</item>
+        <item name="colorSurface">#0F101E</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#0F101E</item>
+        <item name="android:windowBackground">#0F101E</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_27" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#1A1A1A</item>
+        <item name="bg_primary">#1F1F1F</item>
+        <item name="nextdock_background">#1A1A1A</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#CFAB73</item>
+        <item name="colorAccent">#CFAB73</item>
+        <item name="android:colorAccent">#CFAB73</item>
+        <item name="colorSecondary">#CFAB73</item>
+        <item name="colorSurface">#1A1A1A</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#1A1A1A</item>
+        <item name="android:windowBackground">#1A1A1A</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_28" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#031113</item>
+        <item name="bg_primary">#0D1B1D</item>
+        <item name="nextdock_background">#031113</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#ADDDB1</item>
+        <item name="colorAccent">#ADDDB1</item>
+        <item name="android:colorAccent">#ADDDB1</item>
+        <item name="colorSecondary">#ADDDB1</item>
+        <item name="colorSurface">#031113</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#031113</item>
+        <item name="android:windowBackground">#031113</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_29" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#2E3440</item>
+        <item name="bg_primary">#3B4252</item>
+        <item name="nextdock_background">#3B4252</item>
+        <item name="text_primary">#ECEFF4</item>
+        <item name="text_secondary">#E5E9F0</item>
+        <item name="colorPrimary">#5E81AC</item>
+        <item name="colorAccent">#5E81AC</item>
+        <item name="android:colorAccent">#5E81AC</item>
+        <item name="colorSecondary">#5E81AC</item>
+        <item name="colorSurface">#2E3440</item>
+        <item name="colorOnSurface">#ECEFF4</item>
+        <item name="colorOnSurfaceVariant">#E5E9F0</item>
+        <item name="android:colorBackground">#2E3440</item>
+        <item name="android:windowBackground">#2E3440</item>
+        <item name="android:textColorPrimary">#ECEFF4</item>
+        <item name="android:textColorSecondary">#E5E9F0</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_30" parent="Theme.Vkx.Light">
+        <item name="bg_page">#ECEFF4</item>
+        <item name="bg_primary">#E5E9F0</item>
+        <item name="nextdock_background">#E5E9F0</item>
+        <item name="text_primary">#2E3440</item>
+        <item name="text_secondary">#3B4252</item>
+        <item name="colorPrimary">#5E81AC</item>
+        <item name="colorAccent">#5E81AC</item>
+        <item name="android:colorAccent">#5E81AC</item>
+        <item name="colorSecondary">#5E81AC</item>
+        <item name="colorSurface">#ECEFF4</item>
+        <item name="colorOnSurface">#2E3440</item>
+        <item name="colorOnSurfaceVariant">#3B4252</item>
+        <item name="android:colorBackground">#ECEFF4</item>
+        <item name="android:windowBackground">#ECEFF4</item>
+        <item name="android:textColorPrimary">#2E3440</item>
+        <item name="android:textColorSecondary">#3B4252</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="VkxCatalogTheme_31" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#3C3836</item>
+        <item name="bg_primary">#282828</item>
+        <item name="nextdock_background">#282828</item>
+        <item name="text_primary">#EBDBB2</item>
+        <item name="text_secondary">#D5C4A1</item>
+        <item name="colorPrimary">#D5C4A1</item>
+        <item name="colorAccent">#D5C4A1</item>
+        <item name="android:colorAccent">#D5C4A1</item>
+        <item name="colorSecondary">#D5C4A1</item>
+        <item name="colorSurface">#3C3836</item>
+        <item name="colorOnSurface">#EBDBB2</item>
+        <item name="colorOnSurfaceVariant">#D5C4A1</item>
+        <item name="android:colorBackground">#3C3836</item>
+        <item name="android:windowBackground">#3C3836</item>
+        <item name="android:textColorPrimary">#EBDBB2</item>
+        <item name="android:textColorSecondary">#D5C4A1</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_32" parent="Theme.Vkx.Light">
+        <item name="bg_page">#FBF1C7</item>
+        <item name="bg_primary">#EBDBB2</item>
+        <item name="nextdock_background">#EBDBB2</item>
+        <item name="text_primary">#3C3836</item>
+        <item name="text_secondary">#504945</item>
+        <item name="colorPrimary">#504945</item>
+        <item name="colorAccent">#504945</item>
+        <item name="android:colorAccent">#504945</item>
+        <item name="colorSecondary">#504945</item>
+        <item name="colorSurface">#FBF1C7</item>
+        <item name="colorOnSurface">#3C3836</item>
+        <item name="colorOnSurfaceVariant">#504945</item>
+        <item name="android:colorBackground">#FBF1C7</item>
+        <item name="android:windowBackground">#FBF1C7</item>
+        <item name="android:textColorPrimary">#3C3836</item>
+        <item name="android:textColorSecondary">#504945</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="VkxCatalogTheme_33" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#000000</item>
+        <item name="bg_primary">#121212</item>
+        <item name="nextdock_background">#000000</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#06AEFF</item>
+        <item name="colorAccent">#06AEFF</item>
+        <item name="android:colorAccent">#06AEFF</item>
+        <item name="colorSecondary">#06AEFF</item>
+        <item name="colorSurface">#000000</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#000000</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_34" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#353A27</item>
+        <item name="bg_primary">#3E452C</item>
+        <item name="nextdock_background">#3E452C</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#BAB581</item>
+        <item name="colorAccent">#BAB581</item>
+        <item name="android:colorAccent">#BAB581</item>
+        <item name="colorSecondary">#BAB581</item>
+        <item name="colorSurface">#353A27</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#353A27</item>
+        <item name="android:windowBackground">#353A27</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="VkxCatalogTheme_35" parent="Theme.Vkx.Light">
+        <item name="bg_page">#FAFAFA</item>
+        <item name="bg_primary">#EBEBEB</item>
+        <item name="nextdock_background">#EBEBEB</item>
+        <item name="text_primary">#111111</item>
+        <item name="text_secondary">#6B6B70</item>
+        <item name="colorPrimary">#1C71D8</item>
+        <item name="colorAccent">#1C71D8</item>
+        <item name="android:colorAccent">#1C71D8</item>
+        <item name="colorSecondary">#1C71D8</item>
+        <item name="colorSurface">#FAFAFA</item>
+        <item name="colorOnSurface">#111111</item>
+        <item name="colorOnSurfaceVariant">#6B6B70</item>
+        <item name="android:colorBackground">#FAFAFA</item>
+        <item name="android:windowBackground">#FAFAFA</item>
+        <item name="android:textColorPrimary">#111111</item>
+        <item name="android:textColorSecondary">#6B6B70</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="VkxCatalogTheme_36" parent="Theme.Vkx.Dark">
+        <item name="bg_page">#242424</item>
+        <item name="bg_primary">#303030</item>
+        <item name="nextdock_background">#303030</item>
+        <item name="text_primary">#FFFFFF</item>
+        <item name="text_secondary">#8E8E93</item>
+        <item name="colorPrimary">#78AEED</item>
+        <item name="colorAccent">#78AEED</item>
+        <item name="android:colorAccent">#78AEED</item>
+        <item name="colorSecondary">#78AEED</item>
+        <item name="colorSurface">#242424</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#8E8E93</item>
+        <item name="android:colorBackground">#242424</item>
+        <item name="android:windowBackground">#242424</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#8E8E93</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

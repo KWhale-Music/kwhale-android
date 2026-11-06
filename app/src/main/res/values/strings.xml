@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VK X</string>
+    <string name="mab_play">Слушать</string>
+    <string name="mab_shuffle">Перемешать</string>
+    <string name="shuffle">Перемешать</string>
+    <string name="show_all">Все</string>
+    <string name="catalog_new">Новинки</string>
+    <string name="catalog_artists">Артисты</string>
+    <string name="catalog_charts">Чарты</string>
+    <string name="catalog_playlists">Плейлисты</string>
+    <string name="catalog_for_you">Для вас</string>
+    <string name="catalog_banner_title">VK X</string>
+    <string name="catalog_banner_text">Ваша музыка, собранная заново</string>
+    <string name="catalog_banner_action">Слушать</string>
+    <string name="tab_home">Главная</string>
+    <string name="tab_search">Поиск</string>
+    <string name="tab_mix">Миксы</string>
+    <string name="tab_library">Библиотека</string>
+    <string name="tab_menu">Меню</string>
+    <string name="placeholder_soon">Скоро</string>
+
+    <string name="library_title">Библиотека</string>
+    <string name="library_loaded">Загружено</string>
+    <string name="library_my_tracks">Мои аудиозаписи</string>
+    <string name="library_sort_default">по умолчанию</string>
+    <string name="library_downloads_empty">Скачанные треки появятся здесь</string>
+    <string name="library_tracks">Треки</string>
+    <string name="library_albums">Альбомы</string>
+    <string name="library_artists">Артисты</string>
+    <string name="library_playlists">Плейлисты</string>
+    <string name="library_empty">Пока пусто</string>
+    <string name="library_empty_hint">Лайкните трек, чтобы он появился здесь</string>
+
+    <string name="search_title">Поиск</string>
+    <string name="search_hint">Треки, альбомы, артисты</string>
+    <string name="search_start">Что послушаем?</string>
+    <string name="search_empty">Ничего не найдено</string>
+    <string name="search_popular">Популярные запросы</string>
+    <string name="popular_tracks">Популярные треки</string>
+    <string name="albums">Альбомы</string>
+
+    <string name="menu_title">Меню</string>
+    <string name="menu_account">Аккаунт</string>
+    <string name="menu_history">История прослушиваний</string>
+    <string name="menu_links">Привязанные ссылки</string>
+    <string name="menu_library_settings">Настройки библиотеки</string>
+    <string name="menu_appearance">Оформление</string>
+    <string name="menu_about">О приложении</string>
+    <string name="menu_logout">Выйти</string>
+    <string name="menu_soon">Следующий шаг — пересборка по декомпу</string>
+    <string name="about_text">VK X — пересоздание интерфейса. Данные мок, сеть отложена.</string>
+    <string name="back">Назад</string>
+    <string name="track_menu">Меню трека</string>
+    <string name="track_menu_like">В мою музыку</string>
+    <string name="track_menu_unlike">Убрать из моей музыки</string>
+    <string name="track_menu_playlist">В плейлист</string>
+    <string name="track_menu_remove">Удалить из плейлиста</string>
+    <string name="track_menu_share">Поделиться</string>
+    <string name="track_menu_download">Скачать</string>
+    <string name="soon">Скоро</string>
+
+    <string name="auth_title">VK X</string>
+    <string name="auth_subtitle">Core music · вход по email</string>
+    <string name="auth_email">Email</string>
+    <string name="auth_password">Пароль</string>
+    <string name="auth_display_name">Имя</string>
+    <string name="auth_invite">Инвайт-токен</string>
+    <string name="auth_login">Войти</string>
+    <string name="auth_register">Создать аккаунт</string>
+    <string name="auth_toggle_register">Нет аккаунта? Создать</string>
+    <string name="auth_toggle_login">Уже есть аккаунт? Войти</string>
+    <string name="auth_demo">Продолжить без аккаунта (демо)</string>
+    <string name="auth_required">Заполните email и пароль</string>
+    <string name="auth_register_required">Заполните имя, инвайт-токен, email и пароль</string>
+    <string name="auth_error">Не удалось войти: %1$s</string>
+    <string name="auth_loading">Входим…</string>
+    <string name="auth_logout_confirm">Выйти из аккаунта?</string>
+
+    <string name="remote_playlist_add">Добавить в плейлист</string>
+    <string name="remote_playlist_new">Новый плейлист</string>
+    <string name="remote_playlist_name">Название</string>
+    <string name="remote_playlist_create">Создать</string>
+    <string name="remote_playlist_added">Добавлено в плейлист</string>
+    <string name="remote_playlist_error">Не удалось обновить плейлист</string>
+    <string name="remote_playlist_empty">Плейлистов пока нет</string>
+
+    <string name="track_menu_lyrics">Текст песни</string>
+    <string name="lyrics_title">Текст песни</string>
+    <string name="lyrics_empty">Текст пока недоступен</string>
+    <string name="lyrics_error">Не удалось загрузить текст</string>
+
+    <string name="onboarding_title">Что вы слушаете?</string>
+    <string name="onboarding_done">Готово</string>
+    <string name="onboarding_skip">Пропустить</string>
+</resources>

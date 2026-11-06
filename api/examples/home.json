@@ -1,0 +1,64 @@
+{
+  "sections": [
+    {
+      "id": "banner",
+      "kind": "banner",
+      "layout": "banner",
+      "items": [
+        {
+          "type": "banner",
+          "banner": {
+            "id": "banner_1",
+            "title": "VKX Core",
+            "subtitle": "Музыка без VK",
+            "image": { "id": "img_banner_1", "width": 1200, "height": 480 },
+            "action": "play:for-you"
+          }
+        }
+      ]
+    },
+    {
+      "id": "for-you",
+      "title": "Для вас",
+      "kind": "recommendation",
+      "layout": "carousel",
+      "seeAll": true,
+      "items": [
+        {
+          "type": "track",
+          "track": {
+            "id": "track_1",
+            "title": "Night Drive",
+            "artists": [{ "id": "artist_1", "name": "Neon" }],
+            "durationMs": 214000,
+            "explicit": false,
+            "cover": { "id": "img_track_1", "width": 600, "height": 600 },
+            "isLiked": false,
+            "isDisliked": false,
+            "hasLyrics": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "mixes",
+      "title": "Миксы",
+      "kind": "mix",
+      "layout": "carousel",
+      "items": [
+        {
+          "type": "mix",
+          "mix": {
+            "id": "mix_1",
+            "title": "Мой микс",
+            "subtitle": "Персональный",
+            "cover": { "id": "img_mix_1", "width": 600, "height": 600 },
+            "kind": "personal",
+            "createdAt": "2026-11-04T12:00:00Z",
+            "updatedAt": "2026-11-04T12:00:00Z"
+          }
+        }
+      ]
+    }
+  ]
+}

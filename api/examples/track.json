@@ -1,0 +1,23 @@
+{
+  "id": "track_1",
+  "title": "Night Drive",
+  "artists": [{ "id": "artist_1", "name": "Neon" }],
+  "album": {
+    "id": "album_1",
+    "title": "After Hours",
+    "cover": { "id": "img_album_1", "width": 600, "height": 600 }
+  },
+  "durationMs": 214000,
+  "explicit": false,
+  "cover": { "id": "img_track_1", "width": 600, "height": 600 },
+  "genre": { "id": "genre_synth", "name": "Synthwave" },
+  "year": 2026,
+  "trackNumber": 1,
+  "discNumber": 1,
+  "isLiked": true,
+  "isDisliked": false,
+  "hasLyrics": true,
+  "previewAvailable": true,
+  "playCount": 12045,
+  "createdAt": "2026-11-04T12:00:00Z"
+}

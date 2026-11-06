@@ -1,0 +1,20 @@
+{
+  "events": [
+    {
+      "id": "0f3b5a5e-5f0e-4d8a-9a0e-2f6b1d7c9a11",
+      "type": "play",
+      "trackId": "track_1",
+      "context": { "source": "mix", "mixId": "mix_1" },
+      "positionMs": 0,
+      "occurredAt": "2026-11-04T12:00:00Z"
+    },
+    {
+      "id": "1f3b5a5e-5f0e-4d8a-9a0e-2f6b1d7c9a12",
+      "type": "skip",
+      "trackId": "track_1",
+      "context": { "source": "mix", "mixId": "mix_1" },
+      "positionMs": 42000,
+      "occurredAt": "2026-11-04T12:00:42Z"
+    }
+  ]
+}

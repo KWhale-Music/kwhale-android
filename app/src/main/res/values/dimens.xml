@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="post_side_padding">16.0dp</dimen>
+    <dimen name="dock_height">72.0dp</dimen>
+    <dimen name="dock_item_size">46.0dp</dimen>
+    <dimen name="dock_icon_size">24.0dp</dimen>
+    <dimen name="mini_player_height">61.0dp</dimen>
+    <dimen name="artist_header_height_v2">260.0dp</dimen>
+    <dimen name="media_row_cover">64.0dp</dimen>
+</resources>

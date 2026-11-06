@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TextStyle">
+        <item name="android:textSize">14.0sp</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:textColor">?attr/text_primary</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textAlignment">viewStart</item>
+    </style>
+
+    <style name="TextStyle.ListItem" parent="TextStyle">
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <style name="TextStyle.ListItem.Snippet" parent="TextStyle.ListItem">
+        <item name="android:textColor">?attr/text_secondary</item>
+    </style>
+
+    <style name="TextStyle.ListItem.Title" parent="TextStyle.ListItem">
+        <item name="android:textSize">16.0sp</item>
+        <item name="android:textColor">?attr/text_primary</item>
+    </style>
+
+    <style name="TextButton" parent="TextStyle">
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
+        <item name="android:minHeight">48.0dp</item>
+        <item name="android:paddingStart">16.0dp</item>
+        <item name="android:paddingEnd">16.0dp</item>
+    </style>
+
+    <style name="TextButton.Blue" parent="TextButton">
+        <item name="android:textColor">?attr/colorAccent</item>
+    </style>
+
+    <style name="MusicThemedActionBtn" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textColor">?attr/text_primary</item>
+        <item name="cornerRadius">8.0dp</item>
+        <item name="iconTint">?attr/text_primary</item>
+    </style>
+</resources>
