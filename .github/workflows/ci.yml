@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vkx-recreate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Lint
+        run: ./gradlew :app:lintDebug
+      - name: Unit tests
+        run: ./gradlew :core:network:testDebugUnitTest
+      - name: Assemble
+        run: ./gradlew :app:assembleDebug

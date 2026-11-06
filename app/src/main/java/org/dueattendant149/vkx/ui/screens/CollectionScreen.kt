@@ -30,13 +30,18 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,6 +61,7 @@ import kotlinx.coroutines.launch
 import org.dueattendant149.vkx.VkxApp
 import org.dueattendant149.vkx.data.toUi
 import org.dueattendant149.vkx.network.model.Album
+import org.dueattendant149.vkx.network.model.PlaylistUpdate
 import org.dueattendant149.vkx.network.model.Track as ApiTrack
 import org.dueattendant149.vkx.ui.components.AlbumCard
 import org.dueattendant149.vkx.ui.components.BlurredCoverBackground
@@ -81,6 +87,10 @@ fun CollectionScreen(
     var tracks by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
     var canEdit by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showRename by remember { mutableStateOf(false) }
+    var showDelete by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
@@ -159,8 +169,34 @@ fun CollectionScreen(
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
                     }
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "Ещё")
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = "Ещё")
+                        }
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                            if (kind == "playlist" && canEdit) {
+                                DropdownMenuItem(
+                                    text = { Text("Переименовать") },
+                                    onClick = {
+                                        showMenu = false
+                                        renameText = title
+                                        showRename = true
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Удалить плейлист") },
+                                    onClick = {
+                                        showMenu = false
+                                        showDelete = true
+                                    },
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Действия недоступны") },
+                                    onClick = { showMenu = false },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -322,6 +358,56 @@ fun CollectionScreen(
                 }
             }
         }
+    }
+
+    if (showRename) {
+        AlertDialog(
+            onDismissRequest = { showRename = false },
+            title = { Text("Переименовать плейлист") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text("Название") },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRename = false
+                    scope.launch {
+                        runCatching {
+                            app.api.updatePlaylist(collectionId, PlaylistUpdate(title = renameText))
+                        }.onSuccess {
+                            title = renameText
+                            reload++
+                        }
+                    }
+                }) { Text("Сохранить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRename = false }) { Text("Отмена") }
+            },
+        )
+    }
+
+    if (showDelete) {
+        AlertDialog(
+            onDismissRequest = { showDelete = false },
+            title = { Text("Удалить плейлист?") },
+            text = { Text("Плейлист будет удалён безвозвратно.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDelete = false
+                    scope.launch {
+                        runCatching { app.api.deletePlaylist(collectionId) }.onSuccess { onBack() }
+                    }
+                }) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDelete = false }) { Text("Отмена") }
+            },
+        )
     }
 }
 
