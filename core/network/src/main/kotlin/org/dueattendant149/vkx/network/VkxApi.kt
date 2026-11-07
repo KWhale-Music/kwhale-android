@@ -3,6 +3,7 @@ package org.dueattendant149.vkx.network
 import kotlinx.serialization.json.Json
 import org.dueattendant149.vkx.network.model.Album
 import org.dueattendant149.vkx.network.model.AlbumsPage
+import org.dueattendant149.vkx.network.model.EnrichmentListPage
 import org.dueattendant149.vkx.network.model.Artist
 import org.dueattendant149.vkx.network.model.ArtistsPage
 import org.dueattendant149.vkx.network.model.AuthResponse
@@ -306,12 +307,30 @@ class VkxApi(
     ): TrackRecommendationsPage =
         client.get("/mixes/$id/tracks", TrackRecommendationsPage.serializer(), query(cursor, limit))
 
-    suspend fun promptMix(prompt: String, size: Int = 40): TrackRecommendationsPage =
+    suspend fun promptMix(
+        prompt: String,
+        size: Int = 40,
+        llmApiKey: String? = null,
+        llmEndpoint: String? = null,
+        llmModel: String? = null,
+    ): TrackRecommendationsPage =
         client.post(
             "/mixes/prompt",
-            json.encodeToString(PromptMixRequest.serializer(), PromptMixRequest(prompt, size)),
+            json.encodeToString(
+                PromptMixRequest.serializer(),
+                PromptMixRequest(prompt, size, llmApiKey, llmEndpoint, llmModel),
+            ),
             TrackRecommendationsPage.serializer(),
         )
+
+    suspend fun enrichments(): EnrichmentListPage =
+        client.get("/uploads/enrichments", EnrichmentListPage.serializer())
+
+    suspend fun confirmEnrichment(id: Long) =
+        client.postUnit("/uploads/enrichments/$id/confirm", null)
+
+    suspend fun rejectEnrichment(id: Long) =
+        client.postUnit("/uploads/enrichments/$id/reject", null)
 
     // ---- events / config --------------------------------------------------
 

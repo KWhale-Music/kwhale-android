@@ -1,6 +1,13 @@
 package org.dueattendant149.vkx.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,21 +40,31 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import org.dueattendant149.vkx.design.VkxCoverPalette
+import org.dueattendant149.vkx.design.VkxPlural
+import org.dueattendant149.vkx.design.VkxSpacing
 import org.dueattendant149.vkx.model.Track as UiTrack
 import org.dueattendant149.vkx.network.VkxApi
 import org.dueattendant149.vkx.network.model.Album
@@ -64,47 +81,182 @@ fun formatDuration(ms: Long): String {
 fun ApiTrack.artistLine(): String =
     artists.joinToString(", ") { it.name }.ifBlank { "Неизвестный артист" }
 
-fun ApiTrack.imageUrl(api: VkxApi, size: String = "md"): String? = cover?.let { api.imageUrl(it.id, size) }
+/**
+ * Cover URL helpers.
+ *
+ * The API answers `placeholder` for rows without artwork; requesting it made the
+ * client download a generated grey square and paint it over the real fallback.
+ * Returning null instead lets [CoverArt] draw the gradient + initial plate.
+ */
+private const val PLACEHOLDER_IMAGE_ID = "placeholder"
 
-fun Album.imageUrl(api: VkxApi, size: String = "md"): String? = cover?.let { api.imageUrl(it.id, size) }
+private fun imageIdOrNull(id: String?): String? =
+    id?.takeIf { it.isNotBlank() && it != PLACEHOLDER_IMAGE_ID }
 
-fun Playlist.imageUrl(api: VkxApi, size: String = "md"): String? = cover?.let { api.imageUrl(it.id, size) }
+fun ApiTrack.imageUrl(api: VkxApi, size: String = "md"): String? =
+    // Fall back to the album artwork: the API frequently sends `placeholder`
+    // for the track while the album row carries a real image (e.g. SoundCloud
+    // uploads where only the album art was scraped).
+    (imageIdOrNull(cover?.id) ?: imageIdOrNull(album?.cover?.id))
+        ?.let { api.imageUrl(it, size) }
 
-fun Artist.imageUrl(api: VkxApi, size: String = "md"): String? = avatar?.let { api.imageUrl(it.id, size) }
+fun Album.imageUrl(api: VkxApi, size: String = "md"): String? =
+    imageIdOrNull(cover?.id)?.let { api.imageUrl(it, size) }
 
+fun Playlist.imageUrl(api: VkxApi, size: String = "md"): String? =
+    imageIdOrNull(cover?.id)?.let { api.imageUrl(it, size) }
+
+fun Artist.imageUrl(api: VkxApi, size: String = "md"): String? =
+    imageIdOrNull(avatar?.id)?.let { api.imageUrl(it, size) }
+
+/** Stable gradient seed for a cover-less entity. */
+fun ApiTrack.coverSeed(): String = title.ifBlank { artistLine() }
+
+fun Album.coverSeed(): String = title
+
+fun Playlist.coverSeed(): String = title
+
+fun Artist.coverSeed(): String = name
+
+@Composable
+private fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
+/**
+ * Cover thumbnail with a designed fallback.
+ *
+ * Three states, all deliberate:
+ *  1. artwork available -> fades in over the plate (no white flash);
+ *  2. no artwork        -> brand gradient + first letter of [seed];
+ *  3. loading           -> plate only, so the grid never jumps.
+ */
 @Composable
 fun CoverArt(
     imageUrl: String?,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
     iconSize: Int = 20,
+    seed: String = "",
+    showInitial: Boolean = true,
 ) {
+    val dark = isDarkTheme()
+    val gradient = remember(seed, dark) { VkxCoverPalette.gradient(seed, dark) }
+    val onGradient = remember(seed, dark) { VkxCoverPalette.onGradient(seed, dark) }
+    val initial = remember(seed) { VkxCoverPalette.initialOf(seed) }
+    val description = remember(seed) { seed.ifBlank { "Обложка" } }
+
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.surfaceContainerHighest,
-                        MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                ),
-            ),
+            .background(Brush.linearGradient(gradient))
+            .semantics { contentDescription = "Обложка: $description" },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Icons.Rounded.MusicNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-            modifier = Modifier.size(iconSize.dp),
-        )
+        if (showInitial && initial.isNotEmpty()) {
+            Text(
+                text = initial,
+                color = onGradient,
+                fontSize = (iconSize * 1.15f).sp,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.MusicNote,
+                contentDescription = null,
+                tint = onGradient.copy(alpha = 0.85f),
+                modifier = Modifier.size(iconSize.dp),
+            )
+        }
+
         if (!imageUrl.isNullOrBlank()) {
-            AsyncImage(
+            SubcomposeAsyncImage(
                 model = imageUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
+                loading = { Box(Modifier.matchParentSize()) },
+                error = { Box(Modifier.matchParentSize()) },
+                success = { SubcomposeAsyncImageContent() },
             )
+        }
+    }
+}
+
+/**
+ * Shimmer plate used while a list loads.
+ *
+ * Replaces bare `CircularProgressIndicator` screens: the layout keeps its final
+ * shape so content does not jump into place when data arrives.
+ */
+@Composable
+fun ShimmerBox(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(8.dp),
+) {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1150, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "shimmerProgress",
+    )
+    val base = MaterialTheme.colorScheme.surfaceContainerHigh
+    val highlight = MaterialTheme.colorScheme.surfaceContainerHighest
+
+    Box(
+        modifier
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(base, highlight, base),
+                    start = Offset(progress * 720f - 360f, 0f),
+                    end = Offset(progress * 720f, 260f),
+                ),
+            ),
+    )
+}
+
+/** Skeleton for a [TrackRow] list. */
+@Composable
+fun TrackRowSkeleton(modifier: Modifier = Modifier, withNumber: Boolean = false) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = VkxSpacing.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (withNumber) {
+            ShimmerBox(Modifier.width(26.dp).height(12.dp), RoundedCornerShape(4.dp))
+            Spacer(Modifier.width(VkxSpacing.xs))
+        }
+        ShimmerBox(Modifier.size(VkxSpacing.cover), RoundedCornerShape(10.dp))
+        Spacer(Modifier.width(VkxSpacing.sm))
+        Column(Modifier.weight(1f)) {
+            ShimmerBox(Modifier.fillMaxWidth(0.62f).height(14.dp), RoundedCornerShape(4.dp))
+            Spacer(Modifier.height(6.dp))
+            ShimmerBox(Modifier.fillMaxWidth(0.38f).height(11.dp), RoundedCornerShape(4.dp))
+        }
+    }
+}
+
+/** Skeleton for horizontal card carousels. */
+@Composable
+fun CardCarouselSkeleton(modifier: Modifier = Modifier, cardWidth: Int = 140, count: Int = 3) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(VkxSpacing.sm),
+    ) {
+        repeat(count) {
+            Column(Modifier.width(cardWidth.dp)) {
+                ShimmerBox(Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(10.dp))
+                Spacer(Modifier.height(VkxSpacing.xs))
+                ShimmerBox(Modifier.fillMaxWidth(0.8f).height(12.dp), RoundedCornerShape(4.dp))
+                Spacer(Modifier.height(5.dp))
+                ShimmerBox(Modifier.fillMaxWidth(0.55f).height(10.dp), RoundedCornerShape(4.dp))
+            }
         }
     }
 }
@@ -119,7 +271,7 @@ fun SectionHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 24.dp, bottom = 10.dp),
+            .padding(top = VkxSpacing.xl, bottom = VkxSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -138,6 +290,13 @@ fun SectionHeader(
     }
 }
 
+/**
+ * One track line.
+ *
+ * Duration moved from its own column into the subtitle so the row keeps two
+ * 48 dp touch targets (like / overflow) without squeezing the title on a 360 dp
+ * screen. The like button animates on press instead of snapping.
+ */
 @Composable
 fun TrackRow(
     track: ApiTrack,
@@ -149,19 +308,23 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     number: Int? = null,
     showCover: Boolean = true,
+    isCurrent: Boolean = false,
 ) {
+    val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
+            .padding(vertical = VkxSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (number != null) {
             Text(
                 text = number.toString(),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.width(26.dp),
             )
@@ -169,18 +332,19 @@ fun TrackRow(
         if (showCover) {
             CoverArt(
                 imageUrl = track.imageUrl(api, size = "sm"),
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(VkxSpacing.cover),
+                shape = RoundedCornerShape(10.dp),
                 iconSize = 20,
+                seed = track.coverSeed(),
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(VkxSpacing.sm))
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = track.title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = titleColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -201,35 +365,54 @@ fun TrackRow(
                 }
             }
             Text(
-                text = track.artistLine(),
-                style = MaterialTheme.typography.bodyMedium,
+                text = if (track.durationMs > 0) {
+                    "${track.artistLine()} · ${formatDuration(track.durationMs)}"
+                } else {
+                    track.artistLine()
+                },
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = formatDuration(track.durationMs),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 8.dp),
-        )
-        IconButton(onClick = onToggleLike, modifier = Modifier.size(40.dp)) {
-            Icon(
-                imageVector = if (liked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
-                contentDescription = if (liked) "Убрать из любимых" else "В любимые",
-                tint = if (liked) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        IconButton(onClick = onOverflow, modifier = Modifier.size(40.dp)) {
+        LikeIconButton(liked = liked, onClick = onToggleLike)
+        IconButton(onClick = onOverflow) {
             Icon(
                 imageVector = Icons.Outlined.MoreVert,
                 contentDescription = "Ещё",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** Heart with a spring press animation, shared by rows, menu and player. */
+@Composable
+fun LikeIconButton(
+    liked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Int = 22,
+) {
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (liked) 1.12f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+        ),
+        label = "likeScale",
+    )
+    IconButton(onClick = onClick, modifier = modifier) {
+        Icon(
+            imageVector = if (liked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
+            contentDescription = if (liked) "Убрать из любимых" else "В любимые",
+            tint = if (liked) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(size.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale },
+        )
     }
 }
 
@@ -243,6 +426,7 @@ fun TrackTile(
     Column(
         modifier = modifier
             .width(132.dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
     ) {
         CoverArt(
@@ -250,10 +434,11 @@ fun TrackTile(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(10.dp),
             iconSize = 28,
+            seed = track.coverSeed(),
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(VkxSpacing.xs))
         Text(
             text = track.title,
             style = MaterialTheme.typography.titleSmall,
@@ -283,6 +468,7 @@ fun AlbumCard(
         title = album.title,
         artist = album.artists.joinToString(", ") { it.name }.ifBlank { "Альбом" },
         coverUrl = album.imageUrl(api),
+        seed = album.coverSeed(),
         onClick = onClick,
         modifier = modifier,
         width = width,
@@ -297,10 +483,12 @@ fun AlbumCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     width: Int = 140,
+    seed: String = "",
 ) {
     Column(
         modifier = modifier
             .width(width.dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
     ) {
         CoverArt(
@@ -308,10 +496,11 @@ fun AlbumCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(10.dp),
             iconSize = 28,
+            seed = seed.ifBlank { title },
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(VkxSpacing.xs))
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
@@ -340,6 +529,7 @@ fun PlaylistCard(
     Column(
         modifier = modifier
             .width(width.dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
     ) {
         CoverArt(
@@ -347,10 +537,11 @@ fun PlaylistCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(10.dp),
             iconSize = 28,
+            seed = playlist.coverSeed(),
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(VkxSpacing.xs))
         Text(
             text = playlist.title,
             style = MaterialTheme.typography.titleSmall,
@@ -359,7 +550,7 @@ fun PlaylistCard(
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = "${playlist.trackCount} треков",
+            text = VkxPlural.tracks(playlist.trackCount),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -378,6 +569,7 @@ fun ArtistCard(
     Column(
         modifier = modifier
             .width(size.dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -386,8 +578,9 @@ fun ArtistCard(
             modifier = Modifier.size(size.dp),
             shape = CircleShape,
             iconSize = 28,
+            seed = artist.coverSeed(),
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(VkxSpacing.xs))
         Text(
             text = artist.name,
             style = MaterialTheme.typography.titleSmall,
@@ -415,19 +608,20 @@ fun ContinueCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(VkxSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CoverArt(
                 imageUrl = track.coverUrl,
                 modifier = Modifier.size(88.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 iconSize = 28,
+                seed = track.title,
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(VkxSpacing.sm))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = "Продолжить",
@@ -448,7 +642,7 @@ fun ContinueCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(VkxSpacing.xs))
                 LinearProgressIndicator(
                     progress = { progress.coerceIn(0f, 1f) },
                     modifier = Modifier
@@ -457,12 +651,13 @@ fun ContinueCard(
                         .clip(CircleShape),
                 )
             }
-            Spacer(Modifier.width(10.dp))
-            IconButton(
-                onClick = onToggle,
+            Spacer(Modifier.width(VkxSpacing.xs))
+            Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .clickable(onClick = onToggle),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -485,28 +680,34 @@ fun BannerCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(160.dp),
         ) {
-            AsyncImage(
-                model = banner.image?.let { api.imageUrl(it.id) },
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+            CoverArt(
+                imageUrl = imageIdOrNull(banner.image?.id)?.let { api.imageUrl(it, "lg") },
                 modifier = Modifier.matchParentSize(),
+                shape = RoundedCornerShape(0.dp),
+                iconSize = 40,
+                seed = banner.title,
+                showInitial = false,
             )
             Box(
                 Modifier
                     .matchParentSize()
-                    .background(Color.Black.copy(alpha = 0.32f)),
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.62f)),
+                        ),
+                    ),
             )
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(16.dp),
+                    .padding(VkxSpacing.md),
             ) {
                 Text(
                     text = banner.title,
@@ -519,7 +720,7 @@ fun BannerCard(
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = Color.White.copy(alpha = 0.82f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -533,31 +734,32 @@ fun BannerCard(
 fun BlurredCoverBackground(
     imageUrl: String?,
     modifier: Modifier = Modifier,
+    seed: String = "",
 ) {
+    val dark = isDarkTheme()
+    val gradient = remember(seed, dark) { VkxCoverPalette.gradient(seed, dark) }
     Box(modifier.fillMaxSize()) {
         if (!imageUrl.isNullOrBlank()) {
-            AsyncImage(
+            SubcomposeAsyncImage(
                 model = imageUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(42.dp),
+                    .blur(48.dp),
+                loading = { Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient))) },
+                error = { Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient))) },
+                success = { SubcomposeAsyncImageContent() },
             )
         } else {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            )
+            Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient)))
         }
-        val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
-                    if (light) MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
-                    else Color.Black.copy(alpha = 0.58f),
+                    if (dark) MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.80f),
                 ),
         )
     }
@@ -570,21 +772,29 @@ fun EmptyState(
     action: String? = null,
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.MusicNote,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(32.dp),
+            .padding(VkxSpacing.xxl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = Icons.Rounded.MusicNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-            modifier = Modifier.size(56.dp),
-        )
-        Spacer(Modifier.height(16.dp))
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                    modifier = Modifier.size(42.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(VkxSpacing.lg))
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge,
@@ -599,7 +809,7 @@ fun EmptyState(
             textAlign = TextAlign.Center,
         )
         if (action != null && onAction != null) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(VkxSpacing.lg))
             androidx.compose.material3.Button(onClick = onAction) {
                 Text(action)
             }
@@ -619,6 +829,7 @@ fun ErrorState(
         action = "Повторить",
         onAction = onRetry,
         modifier = modifier,
+        icon = Icons.Rounded.MusicNote,
     )
 }
 

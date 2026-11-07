@@ -39,6 +39,19 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("onboarding_done", false)
         set(value) { prefs.edit().putBoolean("onboarding_done", value).apply() }
 
+    // ── LLM (OpenAI-compatible) for AI prompt-mixes ─────────────────────
+    var llmApiKey: String
+        get() = prefs.getString("llm_api_key", "").orEmpty()
+        set(value) { prefs.edit().putString("llm_api_key", value.trim()).apply() }
+
+    var llmEndpoint: String
+        get() = prefs.getString("llm_endpoint", "").orEmpty()
+        set(value) { prefs.edit().putString("llm_endpoint", value.trim().trimEnd('/')).apply() }
+
+    var llmModel: String
+        get() = prefs.getString("llm_model", "").orEmpty()
+        set(value) { prefs.edit().putString("llm_model", value.trim()).apply() }
+
     companion object {
         fun normalizeBaseUrl(raw: String): String {
             val trimmed = raw.trim().trimEnd('/')

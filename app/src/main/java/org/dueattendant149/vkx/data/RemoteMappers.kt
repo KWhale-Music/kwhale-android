@@ -13,6 +13,10 @@ import org.dueattendant149.vkx.network.model.Track as ApiTrack
 
 internal fun String.stableId(): Long = toLongOrNull() ?: hashCode().toLong()
 
+/** Mirrors the API's placeholder sentinel: such ids must never be requested. */
+private fun imageIdOrNull(id: String?): String? =
+    id?.takeIf { it.isNotBlank() && it != "placeholder" }
+
 internal fun ApiTrack.toUi(api: VkxApi, isOfflineCached: Boolean = false): Track = Track(
     id = id.stableId(),
     title = title,
@@ -28,7 +32,9 @@ internal fun ApiTrack.toUi(api: VkxApi, isOfflineCached: Boolean = false): Track
     year = year,
     isExplicit = explicit,
     streamUrl = api.streamUrl(id),
-    coverUrl = cover?.let { api.imageUrl(it.id) },
+    // Track artwork wins; album artwork is the fallback (see imageUrl helper).
+    coverUrl = imageIdOrNull(cover?.id)?.let { api.imageUrl(it, "lg") }
+        ?: imageIdOrNull(album?.cover?.id)?.let { api.imageUrl(it, "lg") },
     remoteId = id,
     hasLyrics = hasLyrics,
     isLiked = isLiked,

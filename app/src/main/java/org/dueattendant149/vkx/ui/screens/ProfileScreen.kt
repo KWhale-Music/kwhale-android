@@ -18,6 +18,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedButton
+import org.dueattendant149.vkx.network.model.EnrichmentProposal
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -74,6 +81,7 @@ fun ProfileScreen(
     var trackCount by remember { mutableStateOf(0) }
     var playlistCount by remember { mutableStateOf(0) }
     var downloadCount by remember { mutableStateOf(0) }
+    var enrichments by remember { mutableStateOf<List<EnrichmentProposal>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     val uploadLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -108,6 +116,7 @@ fun ProfileScreen(
         trackCount = runCatching { app.api.libraryTracks(limit = 1).total }.getOrNull() ?: 0
         playlistCount = runCatching { app.api.libraryPlaylists(limit = 1).total }.getOrNull() ?: 0
         downloadCount = DownloadStore(context).all().count { it.file().exists() }
+        enrichments = runCatching { app.api.enrichments().items }.getOrDefault(emptyList())
         loading = false
     }
 
@@ -158,9 +167,36 @@ fun ProfileScreen(
                     .padding(vertical = 20.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                Stat("$trackCount", "треков")
+                Stat("$trackCount", "в библиотеке")
                 Stat("$playlistCount", "плейлистов")
                 Stat("$downloadCount", "скачано")
+            }
+        }
+        if (enrichments.isNotEmpty()) {
+            item {
+                Text(
+                    "Предложения по метаданным",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+            }
+            items(enrichments, key = { it.id }) { prop ->
+                EnrichmentCard(
+                    proposal = prop,
+                    onConfirm = {
+                        scope.launch {
+                            runCatching { app.api.confirmEnrichment(prop.id) }
+                                .onSuccess { enrichments = enrichments.filterNot { it.id == prop.id } }
+                        }
+                    },
+                    onReject = {
+                        scope.launch {
+                            runCatching { app.api.rejectEnrichment(prop.id) }
+                                .onSuccess { enrichments = enrichments.filterNot { it.id == prop.id } }
+                        }
+                    },
+                )
             }
         }
         item { HorizontalDivider() }
@@ -234,4 +270,49 @@ private fun ProfileRow(
             .fillMaxWidth()
             .clickable(onClick = onClick),
     )
+}
+
+@Composable
+private fun EnrichmentCard(
+    proposal: EnrichmentProposal,
+    onConfirm: () -> Unit,
+    onReject: () -> Unit,
+) {
+    val p = proposal.proposed
+    val changes = buildList {
+        p.isrc?.let { add("ISRC: $it") }
+        p.album?.let { add("Альбом: $it") }
+        p.year?.let { add("Год: $it") }
+        p.genre?.let { add("Жанр: $it") }
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "${proposal.title ?: "Трек"} · ${proposal.artists.joinToString()}",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(Modifier.height(4.dp))
+            changes.forEach {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row {
+                Button(onClick = onConfirm) { Text("Подтвердить") }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = onReject) { Text("Отклонить") }
+            }
+        }
+    }
 }

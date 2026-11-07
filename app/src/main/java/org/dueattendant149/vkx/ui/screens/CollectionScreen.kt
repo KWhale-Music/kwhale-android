@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.vkx.VkxApp
+import org.dueattendant149.vkx.design.VkxPlural
 import org.dueattendant149.vkx.data.toUi
 import org.dueattendant149.vkx.network.model.Album
 import org.dueattendant149.vkx.network.model.PlaylistUpdate
@@ -108,7 +109,7 @@ fun CollectionScreen(
                     val album = app.api.album(collectionId)
                     title = album.title
                     subtitle = album.artists.joinToString(", ") { it.name }
-                    meta = listOfNotNull(album.year?.toString(), "${album.trackCount} треков")
+                    meta = listOfNotNull(album.year?.toString(), VkxPlural.tracks(album.trackCount))
                         .joinToString(" · ")
                     cover = album.imageUrl(app.api)
                     tracks = album.tracks.ifEmpty { app.api.albumTracks(collectionId).items }
@@ -126,7 +127,7 @@ fun CollectionScreen(
                     val playlist = app.api.playlist(collectionId)
                     title = playlist.title
                     subtitle = playlist.owner?.displayName ?: "Вы"
-                    meta = "${playlist.trackCount} треков"
+                    meta = VkxPlural.tracks(playlist.trackCount)
                     cover = playlist.imageUrl(app.api)
                     canEdit = playlist.permissions.canEdit
                     tracks = playlist.tracks.ifEmpty { app.api.playlistTracks(collectionId).items }

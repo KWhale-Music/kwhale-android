@@ -2,6 +2,17 @@ package org.dueattendant149.vkx.ui
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,8 +44,6 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SkipNext
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -77,6 +86,9 @@ import kotlinx.coroutines.launch
 import org.dueattendant149.vkx.VkxApp
 import org.dueattendant149.vkx.data.toUi
 import org.dueattendant149.vkx.design.VkxAccents
+import org.dueattendant149.vkx.design.VkxPlural
+import org.dueattendant149.vkx.design.VkxSpacing
+import org.dueattendant149.vkx.design.VkxMotion
 import org.dueattendant149.vkx.download.Downloads
 import org.dueattendant149.vkx.model.Track as UiTrack
 import org.dueattendant149.vkx.network.model.Album
@@ -180,10 +192,26 @@ fun VkxRoot(
             }
         },
     ) { innerPadding ->
+        // Cross-fade + subtle scale on route changes. Tab switches stay instant
+        // (no slide) so the bottom bar does not feel like it flickers.
+        val navTransition = fadeIn(
+            animationSpec = tween(VkxMotion.durationStd, easing = VkxMotion.emphasizedDecelerate),
+        ) + scaleIn(
+            initialScale = 0.98f,
+            animationSpec = tween(VkxMotion.durationStd, easing = VkxMotion.emphasizedDecelerate),
+        )
+        val navExit = fadeOut(
+            animationSpec = tween(VkxMotion.durationFast, easing = VkxMotion.emphasizedAccelerate),
+        )
+
         NavHost(
             navController = navController,
             startDestination = "home",
             modifier = Modifier.padding(innerPadding),
+            enterTransition = { navTransition },
+            exitTransition = { navExit },
+            popEnterTransition = { navTransition },
+            popExitTransition = { navExit },
         ) {
             composable("home") {
                 HomeScreen(
@@ -194,6 +222,7 @@ fun VkxRoot(
                     onOpenSearch = { navController.navigateTop("search") },
                     onSeeAll = { kind -> navController.navigate("all/$kind") },
                     onTrackMenu = { menuTrack = it },
+                    onOpenProfile = { navController.navigateTop("profile") },
                 )
             }
             composable("search") {
@@ -374,65 +403,102 @@ private fun MiniPlayer(
     onNext: () -> Unit,
 ) {
     if (track == null) return
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-            .clickable(onClick = onOpen),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-        shape = RoundedCornerShape(12.dp),
+
+    // Slides in when a queue starts instead of popping into place.
+    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(
+        visibleState = visible,
+        enter = slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+        ) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
     ) {
-        Column {
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CoverArt(
-                    imageUrl = track.coverUrl,
-                    modifier = Modifier.size(44.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    iconSize = 18,
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = VkxSpacing.xs, vertical = VkxSpacing.xxs)
+                .clickable(onClick = onOpen),
+            shape = RoundedCornerShape(percent = 50),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ) {
+            Column {
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = Color.Transparent,
                 )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // content below is unchanged except spacing tokens
+                    MiniPlayerContent(
+                        track = track,
+                        isPlaying = isPlaying,
+                        onToggle = onToggle,
+                        onNext = onNext,
                     )
-                    Text(
-                        text = track.artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                IconButton(onClick = onToggle) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (isPlaying) "Пауза" else "Играть",
-                    )
-                }
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Rounded.SkipNext, contentDescription = "Следующий")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MiniPlayerContent(
+    track: UiTrack,
+    isPlaying: Boolean,
+    onToggle: () -> Unit,
+    onNext: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .padding(horizontal = VkxSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CoverArt(
+            imageUrl = track.coverUrl,
+            modifier = Modifier.size(46.dp),
+            shape = RoundedCornerShape(10.dp),
+            iconSize = 18,
+            seed = track.title,
+        )
+        Spacer(Modifier.width(VkxSpacing.sm))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = track.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = track.artist,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onToggle) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                contentDescription = if (isPlaying) "Пауза" else "Играть",
+            )
+        }
+        IconButton(onClick = onNext) {
+            Icon(Icons.Rounded.SkipNext, contentDescription = "Следующий")
         }
     }
 }
@@ -479,7 +545,7 @@ private fun AddToPlaylistSheet(
                 itemsIndexed(playlists, key = { _, p -> p.id }) { _, playlist ->
                     ListItem(
                         headlineContent = { Text(playlist.title) },
-                        supportingContent = { Text("${playlist.trackCount} треков") },
+                        supportingContent = { Text(VkxPlural.tracks(playlist.trackCount)) },
                         leadingContent = {
                             CoverArt(
                                 imageUrl = playlist.cover?.let { app.api.imageUrl(it.id) },

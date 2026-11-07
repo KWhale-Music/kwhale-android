@@ -31,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -42,6 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import org.dueattendant149.vkx.VkxApp
 import org.dueattendant149.vkx.ui.components.CoverArt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +57,10 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val showAbout = remember { mutableStateOf(false) }
+    val settings = (context.applicationContext as VkxApp).settings
+    val llmEndpoint = remember { mutableStateOf(settings.llmEndpoint) }
+    val llmApiKey = remember { mutableStateOf(settings.llmApiKey) }
+    val llmModel = remember { mutableStateOf(settings.llmModel) }
     val notifPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -93,6 +100,37 @@ fun SettingsScreen(
                     notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Text(
+                "AI-микс (LLM)",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+            OutlinedTextField(
+                value = llmEndpoint.value,
+                onValueChange = { llmEndpoint.value = it; settings.llmEndpoint = it },
+                label = { Text("Эндпоинт (OpenAI-совместимый)") },
+                placeholder = { Text("https://api.deepseek.com") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+            OutlinedTextField(
+                value = llmApiKey.value,
+                onValueChange = { llmApiKey.value = it; settings.llmApiKey = it },
+                label = { Text("API-ключ") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+            OutlinedTextField(
+                value = llmModel.value,
+                onValueChange = { llmModel.value = it; settings.llmModel = it },
+                label = { Text("Модель (необязательно)") },
+                placeholder = { Text("deepseek-chat") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+            )
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SettingsRow("История", Icons.Rounded.History, onHistory)
             SettingsRow("О приложении", Icons.Rounded.Info) {

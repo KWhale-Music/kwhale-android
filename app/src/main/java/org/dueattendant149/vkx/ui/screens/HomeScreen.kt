@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,12 +24,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -61,10 +64,15 @@ import org.dueattendant149.vkx.ui.components.BannerCard
 import org.dueattendant149.vkx.ui.components.ContinueCard
 import org.dueattendant149.vkx.ui.components.ErrorState
 import org.dueattendant149.vkx.ui.components.PlaylistCard
+import org.dueattendant149.vkx.ui.components.CardCarouselSkeleton
 import org.dueattendant149.vkx.ui.components.SectionHeader
+import org.dueattendant149.vkx.ui.components.ShimmerBox
+import org.dueattendant149.vkx.ui.components.TrackRowSkeleton
 import org.dueattendant149.vkx.ui.components.TrackRow
 import org.dueattendant149.vkx.ui.components.TrackTile
 import org.dueattendant149.vkx.ui.components.imageUrl
+import org.dueattendant149.vkx.design.VkxPlural
+import org.dueattendant149.vkx.design.VkxSpacing
 
 @Composable
 fun HomeScreen(
@@ -75,6 +83,7 @@ fun HomeScreen(
     onOpenSearch: () -> Unit,
     onSeeAll: (String) -> Unit = {},
     onTrackMenu: (ApiTrack) -> Unit,
+    onOpenProfile: () -> Unit = {},
 ) {
     var home by remember { mutableStateOf<HomeResponse?>(null) }
     var mixes by remember { mutableStateOf<List<Mix>>(emptyList()) }
@@ -111,9 +120,7 @@ fun HomeScreen(
     }
 
     if (loading && home == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        HomeSkeleton()
         return
     }
     if (home == null) {
@@ -152,7 +159,15 @@ fun HomeScreen(
         promptLoading = true
         promptError = null
         scope.launch {
-            runCatching { app.api.promptMix(text, 30) }
+            runCatching {
+                app.api.promptMix(
+                    text,
+                    30,
+                    llmApiKey = app.settings.llmApiKey.ifBlank { null },
+                    llmEndpoint = app.settings.llmEndpoint.ifBlank { null },
+                    llmModel = app.settings.llmModel.ifBlank { null },
+                )
+            }
                 .onSuccess { page ->
                     val tracks = page.items.map { it.track.toUi(app.api) }
                     if (tracks.isEmpty()) {
@@ -182,10 +197,11 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
-                androidx.compose.material3.TextButton(onClick = onOpenSearch) {
-                    Text("Обзор")
+                IconButton(onClick = onOpenSearch) {
+                    Icon(Icons.Rounded.Search, contentDescription = "Поиск")
                 }
                 Surface(
+                    onClick = onOpenProfile,
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -285,7 +301,7 @@ fun HomeScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                                 Text(
-                                    text = mix.subtitle ?: "${mix.trackCount} треков",
+                                    text = mix.subtitle ?: VkxPlural.tracks(mix.trackCount),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                                 )
@@ -317,7 +333,7 @@ fun HomeScreen(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    text = "${mix.trackCount} треков",
+                                    text = VkxPlural.tracks(mix.trackCount),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -567,5 +583,41 @@ private fun LazyListScope.TrackItems(
             onToggleLike = { onToggleLike(track) },
             onOverflow = { onMenu(track) },
         )
+    }
+}
+
+/**
+ * Load skeleton matching the real layout (header, greeting card, two carousels).
+ *
+ * A centred spinner threw away the whole screen on every cold start; this keeps
+ * the shape so content settles in place instead of jumping.
+ */
+@Composable
+private fun HomeSkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = VkxSpacing.gutter, vertical = VkxSpacing.sm),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ShimmerBox(Modifier.width(150.dp).height(30.dp), RoundedCornerShape(8.dp))
+            Spacer(Modifier.weight(1f))
+            ShimmerBox(Modifier.size(40.dp), CircleShape)
+        }
+        Spacer(Modifier.height(VkxSpacing.lg))
+        ShimmerBox(Modifier.width(220.dp).height(26.dp), RoundedCornerShape(8.dp))
+        Spacer(Modifier.height(VkxSpacing.lg))
+        ShimmerBox(Modifier.fillMaxWidth().height(150.dp), RoundedCornerShape(20.dp))
+        Spacer(Modifier.height(VkxSpacing.xxl))
+        ShimmerBox(Modifier.width(180.dp).height(22.dp), RoundedCornerShape(8.dp))
+        Spacer(Modifier.height(VkxSpacing.sm))
+        CardCarouselSkeleton(cardWidth = 260, count = 2)
+        Spacer(Modifier.height(VkxSpacing.xl))
+        ShimmerBox(Modifier.width(150.dp).height(22.dp), RoundedCornerShape(8.dp))
+        Spacer(Modifier.height(VkxSpacing.sm))
+        TrackRowSkeleton()
+        TrackRowSkeleton()
+        TrackRowSkeleton()
     }
 }

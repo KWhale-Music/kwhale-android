@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.vkx.VkxApp
+import org.dueattendant149.vkx.design.VkxPlural
 import org.dueattendant149.vkx.data.toUi
 import org.dueattendant149.vkx.network.model.Playlist
 import org.dueattendant149.vkx.network.model.Track as ApiTrack
@@ -119,7 +120,7 @@ fun LibraryScreen(
                 kind = "playlist",
                 id = playlist.id,
                 title = playlist.title,
-                subtitle = "${playlist.trackCount} треков",
+                subtitle = VkxPlural.tracks(playlist.trackCount),
                 coverUrl = playlist.cover?.let { app.api.imageUrl(it.id) },
             )
         } + albums.map { album ->

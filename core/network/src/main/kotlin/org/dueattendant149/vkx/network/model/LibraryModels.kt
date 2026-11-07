@@ -1,6 +1,7 @@
 package org.dueattendant149.vkx.network.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 @Serializable
 data class PlaylistCreate(
@@ -58,4 +59,29 @@ data class HistoryPage(
 @Serializable
 data class GenresResponse(
     val items: List<Genre> = emptyList(),
+)
+
+@Serializable
+data class ProposedMetadata(
+    val isrc: String? = null,
+    val album: String? = null,
+    val year: Int? = null,
+    val genre: String? = null,
+    @SerialName("cover_url") val coverUrl: String? = null,
+)
+
+@Serializable
+data class EnrichmentProposal(
+    val id: Long,
+    @SerialName("trackId") val trackId: Long? = null,
+    val title: String? = null,
+    val artists: List<String> = emptyList(),
+    val proposed: ProposedMetadata = ProposedMetadata(),
+    val source: String? = null,
+    @SerialName("createdAt") val createdAt: String? = null,
+)
+
+@Serializable
+data class EnrichmentListPage(
+    val items: List<EnrichmentProposal> = emptyList(),
 )

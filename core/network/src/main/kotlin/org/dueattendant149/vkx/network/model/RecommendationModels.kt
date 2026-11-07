@@ -45,6 +45,9 @@ data class MixesPage(
 data class PromptMixRequest(
     val prompt: String,
     val size: Int = 40,
+    val llmApiKey: String? = null,
+    val llmEndpoint: String? = null,
+    val llmModel: String? = null,
 )
 
 @Serializable

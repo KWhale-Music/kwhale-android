@@ -36,20 +36,6 @@ object VkxAccents {
     fun byId(id: Int): VkxAccent = all.firstOrNull { it.id == id } ?: default
 }
 
-object VkxSpacing {
-    val xxs = 4.dp
-    val xs = 8.dp
-    val sm = 12.dp
-    val md = 16.dp
-    val lg = 20.dp
-    val xl = 24.dp
-    val xxl = 32.dp
-    val screen = 20.dp
-    val miniPlayer = 64.dp
-    val navBar = 80.dp
-    val cover = 48.dp
-}
-
 private val VkSansText = FontFamily(
     Font(R.font.vk_sans_text_light, FontWeight.Light),
     Font(R.font.vk_sans_text_regular, FontWeight.Normal),

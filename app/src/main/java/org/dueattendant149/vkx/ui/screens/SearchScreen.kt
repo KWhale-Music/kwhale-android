@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.vkx.VkxApp
+import org.dueattendant149.vkx.design.VkxPlural
 import org.dueattendant149.vkx.data.toUi
 import org.dueattendant149.vkx.network.model.SearchResponse
 import org.dueattendant149.vkx.network.model.Track as ApiTrack
@@ -323,7 +324,7 @@ private fun TopResult(
         )
         playlist != null -> Quad(
             playlist.title,
-            "${playlist.trackCount} треков",
+            VkxPlural.tracks(playlist.trackCount),
             playlist.imageUrl(app.api),
             { onOpenCollection("playlist", playlist.id) },
         )
