@@ -6,7 +6,7 @@
 
 - OpenAPI 3.1 валиден (`openapi-spec-validator`).
 - **41 path**, **50 schemas**.
-- Все пути, которые вызывает `VkxApi`, присутствуют в спецификации.
+- Все пути, которые вызывает `KwhaleApi`, присутствуют в спецификации.
 - `tools/validate-openapi.sh` — зелёный.
 - Unit-тесты `core:network` — зелёные.
 - `:app:assembleDebug` — зелёный.
@@ -26,7 +26,7 @@
 - Coil `ImageLoader` использует тот же interceptor.
 - `AuthHttpDataSourceFactory` проверяет host медиапотока.
 - `DownloadWorker` качает через `ApiClient` (тот же origin).
-- `EventTracker`, поиск, тексты, миксы — через `VkxApi`.
+- `EventTracker`, поиск, тексты, миксы — через `KwhaleApi`.
 
 ## Остаточные риски
 

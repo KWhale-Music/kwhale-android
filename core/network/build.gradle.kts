@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "org.dueattendant149.vkx.network"
+    namespace = "org.dueattendant149.kwhale.network"
     compileSdk = 35
 
     defaultConfig {

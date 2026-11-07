@@ -1,8 +1,8 @@
-# VK X · KWhale — Android-клиент
+# KWhale — Android-клиент
 
-Переосмысление плеера VK X на современном стеке: **Jetpack Compose + Material 3**, в связке с self-hosted музыкальным сервером **KWhale v3** (FastAPI + PostgreSQL, 9 внешних источников).
+Переосмысление музыкального плеера на современном стеке: **Jetpack Compose + Material 3**, в связке с self-hosted музыкальным сервером **KWhale v3** (FastAPI + PostgreSQL, 9 внешних источников).
 
-> UI — **Jetpack Compose + Material 3** (полный переход с Views/XML завершён). Тема: DARK / LIGHT / AMOLED / Monet + 129 акцентов VK X.
+> UI — **Jetpack Compose + Material 3** (полный переход с Views/XML завершён). Тема: DARK / LIGHT / AMOLED / Monet + 129 акцентов.
 
 ## Стек
 
@@ -16,10 +16,10 @@
 ```
 app/            — Compose-экраны, плеер (Media3), загрузки, виджет, WorkManager
 core:model      — доменные модели (Track, Album, Artist, Playlist)
-core:design     — VkxTheme (M3), 129 акцентов, VK Sans
-core:network    — VkxApi, ApiClient (single-origin), TokenStore, DTO
+core:design     — KwhaleTheme (M3), 129 акцентов, VK Sans
+core:network    — KwhaleApi, ApiClient (single-origin), TokenStore, DTO
 core:player     — PlaybackState (состояние плеера)
-api/            — OpenAPI 3.1 контракт VKX Core v1 (+ mock)
+api/            — OpenAPI 3.1 контракт KWhale Core v1 (+ mock)
 ```
 
 ## Архитектура
@@ -53,7 +53,7 @@ export JAVA_HOME=<jdk-17> ANDROID_HOME=<android-sdk>
 
 ## Сервер
 
-Клиент работает в паре с сервером **KWhale v3** (`../kwhale-v3`): агрегированный поиск по 9 источникам, дедупликация, стриминг через единый `/v1`, библиотека/плейлисты/рекомендации. Контракт — `api/openapi.yaml` (VKX Core v1).
+Клиент работает в паре с сервером **KWhale v3** (`../kwhale-v3`): агрегированный поиск по 9 источникам, дедупликация, стриминг через единый `/v1`, библиотека/плейлисты/рекомендации. Контракт — `api/openapi.yaml` (KWhale Core v1).
 
 ## Mock API
 

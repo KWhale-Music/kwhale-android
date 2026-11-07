@@ -1,10 +1,11 @@
-> Историческая таблица маппинга VK X на VKX Core. В reduced v1 вошли не все
+> Историческая таблица маппинга оригинального приложения на KWhale Core. В reduced v1 вошли не все
+> Символы исходного приложения маскированы как `orig`/`Orig` (подлинные имена — в `re/`).
 > перечисленные пути: radio, uploads обложек/аватаров, similar/related и CRUD
 > миксов исключены. Актуальный набор — `openapi.yaml`.
 
-# Совместимость с VK X 8.14.2
+# Совместимость с оригинальным приложением 8.14.2
 
-Таблица маппинга вызовов оригинала на VKX Core API. Нужна для проверки
+Таблица маппинга вызовов оригинала на KWhale Core API. Нужна для проверки
 функционального паритета и для backend-команды.
 
 ## VK API (`api.vk.com|vk.ru/method/*`)
@@ -42,7 +43,7 @@
 | `audio.recommendationsOnboarding` | `GET/PUT /recommendations/onboarding` |
 | `stats.trackEvents` | `POST /events` |
 | `storage.get/set` | `/config` + локальные настройки |
-| `apps.get` + `VKXNative.x02` | не используется: наш `/auth/login` |
+| `apps.get` + `OrigNative.x02` | не используется: наш `/auth/login` |
 | `execute` + JS `API.audio.search*` | прямые `/search` эндпоинты |
 | `execute` + JS `API.account.getPrivacySettings` | вне Core scope |
 | `utils.resolveScreenName` | `GET /search?q=` или `/resolve` (future) |
@@ -71,7 +72,7 @@
 | Genius / LRCLIB / Musixmatch / VK lyrics | `GET /tracks/{id}/lyrics` |
 | iTunes / MusicBrainz metadata | серверная сторона |
 | Last.fm scrobbling | вне Core scope |
-| OTA `vkx.app` | вне Core scope |
+| OTA `orig.app` | вне Core scope |
 | Firebase/AppMetrica | не используем; при необходимости `POST /events` |
 
 ## Правила

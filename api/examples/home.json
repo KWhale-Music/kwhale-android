@@ -9,7 +9,7 @@
           "type": "banner",
           "banner": {
             "id": "banner_1",
-            "title": "VKX Core",
+            "title": "KWhale Core",
             "subtitle": "Музыка без VK",
             "image": { "id": "img_banner_1", "width": 1200, "height": 480 },
             "action": "play:for-you"

@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "vkx-recreate"
+rootProject.name = "kwhale-android"
 include(":app", ":core:model", ":core:design", ":core:player", ":core:network")

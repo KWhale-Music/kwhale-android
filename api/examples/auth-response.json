@@ -5,7 +5,7 @@
   "tokenType": "Bearer",
   "user": {
     "id": "user_1",
-    "email": "demo@vkx.local",
+    "email": "demo@kwhale.local",
     "displayName": "Demo",
     "createdAt": "2026-11-04T12:00:00Z"
   }

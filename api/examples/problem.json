@@ -1,5 +1,5 @@
 {
-  "type": "https://api.vkx.example/problems/not-found",
+  "type": "https://api.kwhale.example/problems/not-found",
   "title": "Not Found",
   "status": 404,
   "detail": "Track not found",

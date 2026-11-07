@@ -1,4 +1,4 @@
-# VKX Core API — контракт
+# KWhale Core API — контракт
 
 Системная спецификация KWhale v1: [`../../kwhale-v3/docs/KWHALE_V1_SPEC.md`](../../kwhale-v3/docs/KWHALE_V1_SPEC.md).
 
@@ -45,7 +45,7 @@ RFC 7807, `application/problem+json`:
 
 ```json
 {
-  "type": "https://api.vkx.example/problems/not-found",
+  "type": "https://api.kwhale.example/problems/not-found",
   "title": "Not Found",
   "status": 404,
   "detail": "Track not found",

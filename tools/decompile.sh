@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reproducible JADX dump of the VK X APK.
+# Reproducible JADX dump of the original APK.
+# (brand/symbols of the source app are masked as "orig" in docs; real names in re/)
 #
 # Usage:
 #   tools/decompile.sh [output-dir]

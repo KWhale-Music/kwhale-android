@@ -1,15 +1,17 @@
-# Native layer: `libvkx.so` (Ghidra)
+# Native layer: `liborig.so` (Ghidra)
 
-Артефакт: `re/decoded/lib/arm64-v8a/libvkx.so`
-Пакет приложения: `ua.itaysonlab.vkx`, версия `8.14.2_pub` (`100150`).
+> Имя и символы исходного приложения маскированы как `orig`/`Orig` — подлинные имена в архиве `re/`.
+
+Артефакт: `re/decoded/lib/arm64-v8a/liborig.so`
+Пакет приложения: `ua.itaysonlab.orig`, версия `8.14.2_pub` (`100150`).
 
 ## Что это за библиотека
 
-`libvkx.so` — AArch64 ELF, stripped, 1 805 264 байт. Внутри:
+`liborig.so` — AArch64 ELF, stripped, 1 805 264 байт. Внутри:
 
 - libsodium (экспортирует `sodium_*`, `crypto_*`, `randombytes_*`);
 - `JNI_OnLoad` по адресу `0xa5b18`;
-- native-реализация `ua.itaysonlab.vkxnative.VKXNative`.
+- native-реализация `ua.itaysonlab.orignative.OrigNative`.
 
 Это **не сетевой слой VK** и не клиент API. Библиотека занимается
 anti-tamper/anti-hook проверками и вспомогательной криптографией для
@@ -18,13 +20,13 @@ silent-auth. Для нового backend она не нужна.
 ## JNI-регистрация
 
 `JNI_OnLoad` вызывает `RegisterNatives` для класса
-`ua/itaysonlab/vkxnative/VKXNative` с тремя методами:
+`ua/itaysonlab/orignative/OrigNative` с тремя методами:
 
 | Java-метод | Сигнатура | Native-функция |
 |---|---|---|
-| `x00` | `()Lua/itaysonlab/vkxnative/BundleNativeClass;` | `FUN_0x88248` |
-| `x01` | `()Lua/itaysonlab/vkxnative/BundleNativeClass;` | `FUN_0x88248` |
-| `x02` | `(Ljava/lang/String;)Lua/itaysonlab/vkxnative/BundleNativeClass;` | `FUN_0xa4ed0` |
+| `x00` | `()Lua/itaysonlab/orignative/BundleNativeClass;` | `FUN_0x88248` |
+| `x01` | `()Lua/itaysonlab/orignative/BundleNativeClass;` | `FUN_0x88248` |
+| `x02` | `(Ljava/lang/String;)Lua/itaysonlab/orignative/BundleNativeClass;` | `FUN_0xa4ed0` |
 
 `x00` и `x01` — один и тот же код. Они возвращают `BundleNativeClass`
 с массивом строк; в таблице видно 16 имён известных hook/распаковщиков:
@@ -71,8 +73,8 @@ org/lsposed/lsplant/LSPlant
 ```bash
 export JAVA_HOME=/tmp/opencode/jdk25
 /tmp/opencode/ghidra_12.2_PUBLIC/support/analyzeHeadless \
-  /tmp/opencode/ghidra_proj vkx \
-  -import re/decoded/lib/arm64-v8a/libvkx.so \
+  /tmp/opencode/ghidra_proj orig \
+  -import re/decoded/lib/arm64-v8a/liborig.so \
   -overwrite \
   -scriptPath /tmp/opencode/ghidra_scripts \
   -postScript DumpJNI.java
@@ -83,7 +85,7 @@ Ghidra не декомпилирует DEX. Для Java-кода использ�
 
 ## Вывод для проекта
 
-- Портировать `libvkx.so` не нужно.
-- `VKXNative`, проверки hook-фреймворков и silent-auth вырезаются вместе
+- Портировать `liborig.so` не нужно.
+- `OrigNative`, проверки hook-фреймворков и silent-auth вырезаются вместе
   с VK-сетевым кодом.
 - Наша авторизация — собственный `/auth/login` + JWT, без native-зависимостей.

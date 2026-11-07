@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: VKX Core API
+  title: KWhale Core API
   version: 0.2.0
   description: |
-    Единый API для приложения VKX Core.
+    Единый API для приложения KWhale Core.
 
     Правило одного origin: клиент обращается только к `servers[0].url`.
     Все URL в ответах — относительные пути; абсолютные внешние URL запрещены.
@@ -996,7 +996,7 @@ components:
       type: object
       required: [type, title, status]
       properties:
-        type: { type: string, example: https://api.vkx.example/problems/validation }
+        type: { type: string, example: https://api.kwhale.example/problems/validation }
         title: { type: string, example: Validation failed }
         status: { type: integer, example: 400 }
         detail: { type: string }

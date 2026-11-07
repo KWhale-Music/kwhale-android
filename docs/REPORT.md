@@ -1,6 +1,8 @@
-# RE-отчёт: VK X (`ua.itaysonlab.vkx`) 8.14.2_pub
+# RE-отчёт: оригинал (`ua.itaysonlab.orig`) 8.14.2_pub
 
-Реверс выполнен по артефакту `re/VKX_8.14.2_pub_100150.apk`.
+> Имя и символы исходного приложения маскированы как `orig`/`Orig` — подлинные имена в архиве `re/`.
+
+Реверс выполнен по артефакту `re/Orig_8.14.2_pub_100150.apk`.
 Отчёт покрывает **ядро** (плеер, библиотека, поиск, плейлисты, альбом/артист, настройки/темы)
 глубоко и **вырезанный объём** — обзорно, как зафиксировано в решениях.
 
@@ -8,9 +10,9 @@
 
 | | |
 |---|---|
-| Файл | `re/VKX_8.14.2_pub_100150.apk` (37 341 670 байт) |
+| Файл | `re/Orig_8.14.2_pub_100150.apk` (37 341 670 байт) |
 | SHA-256 | `56c33336b347d7126227174b34d2cf92f6d9d43d0e70c78638903f305cb64b92` |
-| Пакет | `ua.itaysonlab.vkx` |
+| Пакет | `ua.itaysonlab.orig` |
 | Версия | `8.14.2_pub`, versionCode `100150` |
 | SDK | min 23 / target 36 / compile 37 |
 | Подпись | self-signed (исходная) |
@@ -29,20 +31,20 @@ UI строится кодом кастомного liquid-движка, а не
 
 ## 1. Верхнеуровневая архитектура
 
-- Application: `ua.itaysonlab.vkx.VKXApplication`.
-- Единственная activity: `ua.itaysonlab.vkx.activity.AppActivity` (`singleTask`, splash-тема,
+- Application: `ua.itaysonlab.orig.OrigApplication`.
+- Единственная activity: `ua.itaysonlab.orig.activity.AppActivity` (`singleTask`, splash-тема,
   `configChanges`, обработка `vk.com/audio*`, `/music*`, `/artist/*`).
 - Сервисы: `...playback.service.PlaybackService` (Media3 `MediaLibraryService`),
   `...downloader.service.DownloaderService`, `...cache.v2.DedicatedCacheService`,
-  `...service.integrations.LibVkxService`, `...service.AutostartLauncherService`.
-- Провайдеры/приёмники: `VkxArtworkContentProvider`, `androidx.startup.InitializationProvider`,
+  `...service.integrations.LibOrigService`, `...service.AutostartLauncherService`.
+- Провайдеры/приёмники: `OrigArtworkContentProvider`, `androidx.startup.InitializationProvider`,
   `MediaButtonReceiver`, `AutostartReceiver`.
 - Мультиплатформенные точки: Glance-виджеты (`PlayerGlanceWidgetReceiver`,
-  `SmallPlaylistsGlanceWidgetReceiver`), `ua.itaysonlab.vkxtv.VkxTvEntrypoint` (LEANBACK),
-  `...playback.auto2.VkxCarAppService` (`androidx.car.app`), Cast
-  (`VkxCastContextProvider`).
-- Тема приложения: `@style/AppTheme.VKX.Liquid.DefaultDark` → `VkxAppThemeBase.MediaRouter`
-  → `VkxAppThemeBase` (`Theme.Material3.Dark`).
+  `SmallPlaylistsGlanceWidgetReceiver`), `ua.itaysonlab.origtv.OrigTvEntrypoint` (LEANBACK),
+  `...playback.auto2.OrigCarAppService` (`androidx.car.app`), Cast
+  (`OrigCastContextProvider`).
+- Тема приложения: `@style/AppTheme.Orig.Liquid.DefaultDark` → `OrigAppThemeBase.MediaRouter`
+  → `OrigAppThemeBase` (`Theme.Material3.Dark`).
 - Liquid-движок: `ru.utkacraft.liquidnavigation.content.LFileProvider`, meta-data
   `liquid-themes-supported=true`, шаблонные layout-ы `box_* / row_* / column_* / complex_* /
   radio_*` как строительные блоки.
@@ -64,7 +66,7 @@ FrameLayout base_frag (чёрный)
 
 ## 3. Навигация и док
 
-- `ua.itaysonlab.vkxreborn.ui.nextdock.NextDockView` — кастомный View; методы
+- `ua.itaysonlab.origreborn.ui.nextdock.NextDockView` — кастомный View; методы
   `setOnItemClickListener`, `setOnLongItemClickListener`, `refreshTheme`, `setLegacyMode`.
 - `res/layout/v6_nextdock_item.xml`: ячейка 72dp, `selected_frame` 46×46dp
   (`@drawable/rounded_card_dock`), иконка 24dp, дополнительная click-зона 120dp.
@@ -122,7 +124,7 @@ FrameLayout base_frag (чёрный)
 - `theme_attrs` задают цвета: `nextdock_background`, `bg_primary`, `@windowBackground`,
   `pref_card_bg`, `alert_background` и др.
 - В пересоздании: режимы **Тёмная / Светлая / AMOLED / Системная (monet)** + палитра
-  из 47 акцентов VKX + динамический цвет Android 12+.
+  из 47 акцентов оригинала + динамический цвет Android 12+.
 
 ## 7. Данные и домен (по классам)
 
@@ -132,7 +134,7 @@ FrameLayout base_frag (чёрный)
 | Методы | `...methods.audio.playlist.AudioGetPlaylist`, `AudioAddAudiosToPlaylist` |
 | Поиск | `...methods.execute.SearchInProfile$SearchResponse`, `$SearchPlaylistResponse` |
 | Каталог | `ua.itaysonlab.catalogkit.objects.Catalog2*` |
-| Кеш | `ua.itaysonlab.vkxreborn.cache.realm.CachedLibrary`, `CachedPlaylistLibrary` |
+| Кеш | `ua.itaysonlab.origreborn.cache.realm.CachedLibrary`, `CachedPlaylistLibrary` |
 
 Пересоздание **зеркалит домен**: `Track`, `Album`, `Artist`, `Playlist`, `User`
 (`core:model`), без привязки к сетевым DTO.
@@ -143,9 +145,9 @@ FrameLayout base_frag (чёрный)
 - Реальные экранные/элементные: `activity_app`, `artist_header_v2c/v2cb`,
   `list_item_track`, `list_item_track_mainonly`, `list_item_track_swipe`,
   `list_item_track_collection`, `list_item_playlist*`, `v6_nextdock_item`,
-  `v7_playlist_header_*`, `vkxui_toolbar_*`, `c3_*` (каталог), `podcast_*`.
+  `v7_playlist_header_*`, `origui_toolbar_*`, `c3_*` (каталог), `podcast_*`.
 - Шрифты: 10 начертаний VK Sans (9 ttf + 1 otf); в пересоздание перенесены 9 ttf.
-- Assets: `theme_catalog.json`, `vkx_eq_prebuilt*.json`, `vkx_default_artwork.webp`,
+- Assets: `theme_catalog.json`, `orig_eq_prebuilt*.json`, `orig_default_artwork.webp`,
   ML Kit barcode-модели (QR-сканер), `PublicSuffixDatabase`.
 
 ## 9. Карта экранов пересоздания
@@ -169,10 +171,10 @@ FrameLayout base_frag (чёрный)
 | Каталог/кураторы | `catalogkit.objects.Catalog2*`, layout-ы `c3_*` |
 | Подкасты/книги | layout-ы `podcast_longread`, `podcast_simple_view`, `podcast_slider_item` |
 | Виджеты | Glance: `PlayerGlanceWidgetReceiver`, `SmallPlaylistsGlanceWidgetReceiver` |
-| Android Auto | `androidx.car.app`, `VkxCarAppService`, `@xml/automotive_app_desc` |
-| Android TV | `ua.itaysonlab.vkxtv.VkxTvEntrypoint` (LEANBACK_LAUNCHER) |
+| Android Auto | `androidx.car.app`, `OrigCarAppService`, `@xml/automotive_app_desc` |
+| Android TV | `ua.itaysonlab.origtv.OrigTvEntrypoint` (LEANBACK_LAUNCHER) |
 | Cast | meta-data `com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME` |
-| Эквалайзер | `assets/vkx_eq_prebuilt.json`, `vkx_eq_prebuilt_vk.json` |
+| Эквалайзер | `assets/orig_eq_prebuilt.json`, `orig_eq_prebuilt_vk.json` |
 
 По решению также вне объёма: радио/миксы/рекомендации, Last.fm, тексты песен, дизлайк,
 офлайн-кеш. В этом проходе они не перепроверялись по классам — это отдельные задачи.
@@ -183,7 +185,7 @@ FrameLayout base_frag (чёрный)
 - Скелет `activity_app` → `Scaffold` + док 72dp + мини-плеер 61dp + маршрут «Сейчас играет».
 - Домен `vkapi2` → модели `core:model`; мок-каталог → `core:data`.
 - Каталог тем → режимы и палитра акцентов в настройках.
-- Вырезанный объём → не реализуется; точка расширения — `VkxRepository`.
+- Вырезанный объём → не реализуется; точка расширения — `OrigRepository`.
 
 ## 12. Ограничения
 
@@ -225,7 +227,7 @@ FrameLayout base_frag (чёрный)
 - Библиотека: пилюли «Библиотека/Загружено», плейлисты 140dp, «Мои аудиозаписи»,
   сортировка, shuffle, трек-строки с `⋮` и explicit.
 - Темы: Light/Dark/AMOLED + DynamicColors (monet); акценты — **129** overlay-стилей
-  `VkxAccent_<id>` из `theme_catalog.json`.
+  `OrigAccent_<id>` из `theme_catalog.json`.
 - Плейлисты: создание, добавление из меню трека, удаление из своего плейлиста.
 - Now-playing: Compose-экран с градиентом, обложкой, seek, shuffle/repeat, лайком.
 

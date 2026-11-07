@@ -4,6 +4,6 @@
     android:layout_height="match_parent"
     android:background="#121212"
     android:gravity="center"
-    android:text="VK X"
+    android:text="KWhale"
     android:textColor="#FFFFFF"
     android:textSize="16sp" />

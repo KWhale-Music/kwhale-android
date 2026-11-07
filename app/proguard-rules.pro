@@ -5,9 +5,9 @@
 -keepclasseswithmembers class kotlinx.serialization.json.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep,includedescriptorclasses class org.dueattendant149.vkx.**$$serializer { *; }
--keepclassmembers class org.dueattendant149.vkx.** { *** Companion; }
--keepclasseswithmembers class org.dueattendant149.vkx.** {
+-keep,includedescriptorclasses class org.dueattendant149.kwhale.**$$serializer { *; }
+-keepclassmembers class org.dueattendant149.kwhale.** { *** Companion; }
+-keepclasseswithmembers class org.dueattendant149.kwhale.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 

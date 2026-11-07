@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "org.dueattendant149.vkx.design"
+    namespace = "org.dueattendant149.kwhale.design"
     compileSdk = 35
 
     defaultConfig {

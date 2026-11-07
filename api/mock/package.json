@@ -1,8 +1,8 @@
 {
-  "name": "vkx-api-mock",
+  "name": "kwhale-api-mock",
   "private": true,
   "version": "0.1.0",
-  "description": "Prism mock for VKX Core API",
+  "description": "Prism mock for KWhale Core API",
   "scripts": {
     "start": "prism mock ../openapi.yaml -p 4010 --host 0.0.0.0"
   },

@@ -1,15 +1,15 @@
-> Reduced v1: радио удалено из контракта; миксы/рекомендации — заглушки до отдельного recommendation-модуля. Таблица ниже — историческая карта паритета VK X.
+> Reduced v1: радио удалено из контракта; миксы/рекомендации — заглушки до отдельного recommendation-модуля. Таблица ниже — историческая карта паритета с оригиналом.
 
-# Паритет: VK X 8.14.2 vs vkx-recreate
+# Паритет: оригинал 8.14.2 vs kwhale-android
 
 ## Границы текущего этапа
 
 Целевой объём — **Core music**, без:
 
-- эквалайзера/DSP (`eq3_*`, `vkx_eq_prebuilt*.json`);
-- Android Auto (`VkxCarAppService`, `as2_*`);
-- Android TV (`ua.itaysonlab.vkxtv`);
-- Cast (`VkxCastContextProvider`, `cast_*`);
+- эквалайзера/DSP (`eq3_*`, `orig_eq_prebuilt*.json`);
+- Android Auto (`OrigCarAppService`, `as2_*`);
+- Android TV (`ua.itaysonlab.origtv`);
+- Cast (`OrigCastContextProvider`, `cast_*`);
 - подкастов и аудиокниг (`podcast_*`, `AudioBook`);
 - Spark/платежей/подписок;
 - социального графа, профилей друзей и ленты новостей.
@@ -23,7 +23,7 @@
 
 | Область | Оригинал (evidence) | Прототип | Статус | Контракт |
 |---|---|---|---|---|
-| Вход | `auth2_*`, `C4551z`, `C0442z`, `C8094z` | `AuthActivity` + `VkxApi` email/password, JWT | частично | `/auth/*` |
+| Вход | `auth2_*`, `C4551z`, `C0442z`, `C8094z` | `AuthActivity` + `OrigApi` email/password, JWT | частично | `/auth/*` |
 | Профиль | `VKProfile`, `MenuView` | заглушка «Вы» | частично | `/me` |
 | Главная | `c3_*`, `HomeView` | `RemoteHomeView` читает `/home` | частично | `/home` |
 | Поиск | `SearchInProfile`, `SearchView` | `RemoteSearchView` читает `/search` | частично | `/search` |
@@ -44,9 +44,9 @@
 | Настройки | `settings_*`, `pref_*` | только темы | частично | `/config` + локально |
 | Уведомление плеера | `PlaybackService` | `MediaSessionService` + медиа-уведомление | частично | клиент |
 | Виджет | Glance `PlayerGlanceWidgetReceiver` | один Glance-виджет плеера | частично | клиент |
-| EQ/DSP | `eq3_*`, `vkx_eq_prebuilt*` | нет | вне scope | — |
-| Android Auto | `VkxCarAppService`, `as2_*` | нет | вне scope | — |
-| Android TV | `vkxtv` | нет | вне scope | — |
+| EQ/DSP | `eq3_*`, `orig_eq_prebuilt*` | нет | вне scope | — |
+| Android Auto | `OrigCarAppService`, `as2_*` | нет | вне scope | — |
+| Android TV | `origtv` | нет | вне scope | — |
 | Cast | `cast_*` | нет | вне scope | — |
 | Подкасты/книги | `podcast_*`, `AudioBook` | нет | вне scope | — |
 | Spark/платежи | `spark_*` | нет | вне scope | — |

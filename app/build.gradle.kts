@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "org.dueattendant149.vkx"
+    namespace = "org.dueattendant149.kwhale"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "org.dueattendant149.vkx"
+        applicationId = "org.dueattendant149.kwhale"
         minSdk = 31
         targetSdk = 35
         versionCode = 1

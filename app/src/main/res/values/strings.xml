@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">VK X</string>
+    <string name="app_name">KWhale</string>
     <string name="mab_play">Слушать</string>
     <string name="mab_shuffle">Перемешать</string>
     <string name="shuffle">Перемешать</string>
@@ -10,7 +10,7 @@
     <string name="catalog_charts">Чарты</string>
     <string name="catalog_playlists">Плейлисты</string>
     <string name="catalog_for_you">Для вас</string>
-    <string name="catalog_banner_title">VK X</string>
+    <string name="catalog_banner_title">KWhale</string>
     <string name="catalog_banner_text">Ваша музыка, собранная заново</string>
     <string name="catalog_banner_action">Слушать</string>
     <string name="tab_home">Главная</string>
@@ -49,7 +49,7 @@
     <string name="menu_about">О приложении</string>
     <string name="menu_logout">Выйти</string>
     <string name="menu_soon">Следующий шаг — пересборка по декомпу</string>
-    <string name="about_text">VK X — пересоздание интерфейса. Данные мок, сеть отложена.</string>
+    <string name="about_text">KWhale — пересоздание интерфейса. Данные мок, сеть отложена.</string>
     <string name="back">Назад</string>
     <string name="track_menu">Меню трека</string>
     <string name="track_menu_like">В мою музыку</string>
@@ -60,7 +60,7 @@
     <string name="track_menu_download">Скачать</string>
     <string name="soon">Скоро</string>
 
-    <string name="auth_title">VK X</string>
+    <string name="auth_title">KWhale</string>
     <string name="auth_subtitle">Core music · вход по email</string>
     <string name="auth_email">Email</string>
     <string name="auth_password">Пароль</string>
