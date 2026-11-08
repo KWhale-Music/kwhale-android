@@ -49,6 +49,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.data.ContentCache
+import org.dueattendant149.kwhale.data.HomeSnapshot
 import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.network.model.HomeResponse
 import org.dueattendant149.kwhale.network.model.HomeSection
@@ -74,9 +76,10 @@ fun HomeScreen(
     onTrackMenu: (ApiTrack) -> Unit,
     onOpenProfile: () -> Unit = {},
 ) {
-    var home by remember { mutableStateOf<HomeResponse?>(null) }
-    var mixes by remember { mutableStateOf<List<Mix>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    val cached = remember { app.cache.read(ContentCache.HOME, HomeSnapshot.serializer()) }
+    var home by remember { mutableStateOf(cached?.home) }
+    var mixes by remember { mutableStateOf(cached?.mixes.orEmpty()) }
+    var loading by remember { mutableStateOf(cached == null) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
     var prompt by remember { mutableStateOf("") }
@@ -85,7 +88,11 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(reload) {
-        loading = true
+        if (reload == 0 && home != null && app.cache.isFresh(ContentCache.HOME, 30_000)) {
+            loading = false
+            return@LaunchedEffect
+        }
+        loading = home == null
         error = null
         runCatching {
             coroutineScope {
@@ -94,8 +101,15 @@ fun HomeScreen(
                     runCatching { app.api.mixes(kind = "personal", limit = 20).items }
                         .getOrDefault(emptyList())
                 }
-                home = homeDeferred.await()
-                mixes = mixesDeferred.await()
+                val nextHome = homeDeferred.await()
+                val nextMixes = mixesDeferred.await()
+                home = nextHome
+                mixes = nextMixes
+                app.cache.write(
+                    ContentCache.HOME,
+                    HomeSnapshot.serializer(),
+                    HomeSnapshot(nextHome, nextMixes),
+                )
             }
         }.onFailure { error = it.message ?: "Ошибка сети" }
         loading = false

@@ -1,25 +1,39 @@
 package org.dueattendant149.kwhale.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,15 +47,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
-import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.Playlist
+import org.dueattendant149.kwhale.network.model.PlaylistCreate
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
 import org.dueattendant149.kwhale.ui.components.EmptyState
 import org.dueattendant149.kwhale.ui.components.PlaylistCard
+import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import org.dueattendant149.kwhale.ui.components.TrackRow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,18 +69,23 @@ fun LibraryAllScreen(
 ) {
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
-    var collections by remember { mutableStateOf<List<LibraryCollection>>(emptyList()) }
     var tracks by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var selectedTab by remember { mutableStateOf(0) } // 0 = albums, 1 = playlists
+    var showCreate by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+    var newDescription by remember { mutableStateOf("") }
+    var creating by remember { mutableStateOf(false) }
+    var createError by remember { mutableStateOf<String?>(null) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
     val title = when (kind) {
         "playlists" -> "Плейлисты"
-        "albums" -> "Альбомы"
         "tracks", "liked" -> "Треки"
         else -> "Альбомы"
     }
+    val canCreatePlaylist = kind == "albums" || kind == "collections" || kind == "playlists"
 
     LaunchedEffect(kind) {
         loading = true
@@ -81,30 +101,37 @@ fun LibraryAllScreen(
                     .getOrDefault(emptyList())
                 albums = runCatching { app.api.libraryAlbums(limit = 100).items }
                     .getOrDefault(emptyList())
-                collections = playlists.map { playlist ->
-                    LibraryCollection(
-                        key = "p-${playlist.id}",
-                        kind = "playlist",
-                        id = playlist.id,
-                        title = playlist.title,
-                        subtitle = KwhalePlural.tracks(playlist.trackCount),
-                        coverUrl = playlist.cover?.let { app.api.imageUrl(it.id) },
-                    )
-                } + albums.map { album ->
-                    LibraryCollection(
-                        key = "a-${album.id}",
-                        kind = "album",
-                        id = album.id,
-                        title = album.title,
-                        subtitle = album.artists.joinToString(", ") { it.name }.ifBlank { "Альбом" },
-                        coverUrl = album.cover?.let { app.api.imageUrl(it.id) },
-                    )
-                }
             }
             else -> tracks = runCatching { app.api.libraryTracks(limit = 200).items }
                 .getOrDefault(emptyList())
         }
         loading = false
+    }
+
+    fun createPlaylist() {
+        val name = newName.trim()
+        if (name.isEmpty() || creating) return
+        creating = true
+        createError = null
+        scope.launch {
+            runCatching {
+                app.api.createPlaylist(
+                    PlaylistCreate(
+                        title = name,
+                        description = newDescription.trim().ifBlank { null },
+                    ),
+                )
+            }.onSuccess { playlist ->
+                app.cache.invalidateLibrary()
+                showCreate = false
+                newName = ""
+                newDescription = ""
+                onOpenCollection("playlist", playlist.id)
+            }.onFailure {
+                createError = it.message ?: "Не удалось создать плейлист"
+            }
+            creating = false
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -115,88 +142,91 @@ fun LibraryAllScreen(
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
                 }
             },
+            actions = {
+                if (canCreatePlaylist) {
+                    IconButton(onClick = { showCreate = true }) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Создать плейлист")
+                    }
+                }
+            },
         )
-        if (loading) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+
+        if (kind == "collections") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    label = { Text("Альбомы") },
+                )
+                FilterChip(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    label = { Text("Плейлисты") },
+                )
             }
+        }
+
+        if (loading) {
+            LibraryAllSkeleton()
             return@Column
         }
+
         when (kind) {
             "collections" -> {
-                if (collections.isEmpty()) {
-                    EmptyState("Пока пусто", "Сохраните альбом или создайте плейлист", modifier = Modifier.weight(1f).fillMaxWidth())
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                if (selectedTab == 0) {
+                    AlbumGrid(
+                        albums = albums,
+                        app = app,
+                        miniPlayerBottom = miniPlayerBottom,
+                        onOpenCollection = onOpenCollection,
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
-                    ) {
-                        items(collections, key = { it.key }) { collection ->
-                            Box(Modifier.padding(6.dp)) {
-                                AlbumCard(
-                                    title = collection.title,
-                                    artist = collection.subtitle,
-                                    coverUrl = collection.coverUrl,
-                                    onClick = { onOpenCollection(collection.kind, collection.id) },
-                                    width = 150,
-                                )
-                            }
-                        }
-                    }
+                    )
+                } else {
+                    PlaylistGrid(
+                        playlists = playlists,
+                        app = app,
+                        miniPlayerBottom = miniPlayerBottom,
+                        onOpenCollection = onOpenCollection,
+                        onCreate = { showCreate = true },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
-            "playlists" -> {
-                if (playlists.isEmpty()) {
-                    EmptyState("Пока пусто", "Создайте первый плейлист", modifier = Modifier.weight(1f).fillMaxWidth())
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
-                    ) {
-                        items(playlists, key = { it.id }) { playlist ->
-                            Box(Modifier.padding(6.dp)) {
-                                PlaylistCard(
-                                    playlist = playlist,
-                                    api = app.api,
-                                    onClick = { onOpenCollection("playlist", playlist.id) },
-                                    width = 150,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            "albums" -> {
-                if (albums.isEmpty()) {
-                    EmptyState("Пока пусто", "Сохраните альбом, чтобы он появился здесь", modifier = Modifier.weight(1f).fillMaxWidth())
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
-                    ) {
-                        items(albums, key = { it.id }) { album ->
-                            Box(Modifier.padding(6.dp)) {
-                                AlbumCard(
-                                    album = album,
-                                    api = app.api,
-                                    onClick = { onOpenCollection("album", album.id) },
-                                    width = 150,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            "playlists" -> PlaylistGrid(
+                playlists = playlists,
+                app = app,
+                miniPlayerBottom = miniPlayerBottom,
+                onOpenCollection = onOpenCollection,
+                onCreate = { showCreate = true },
+                modifier = Modifier.weight(1f),
+            )
+            "albums" -> AlbumGrid(
+                albums = albums,
+                app = app,
+                miniPlayerBottom = miniPlayerBottom,
+                onOpenCollection = onOpenCollection,
+                modifier = Modifier.weight(1f),
+            )
             else -> {
                 if (tracks.isEmpty()) {
-                    EmptyState("Пока пусто", "Лайкните трек, чтобы он появился здесь", modifier = Modifier.weight(1f).fillMaxWidth())
+                    EmptyState(
+                        "Пока пусто",
+                        "Лайкните трек, чтобы он появился здесь",
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
+                        contentPadding = PaddingValues(
+                            start = 20.dp,
+                            end = 20.dp,
+                            bottom = 24.dp + miniPlayerBottom,
+                        ),
                     ) {
                         itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
                             TrackRow(
@@ -210,6 +240,7 @@ fun LibraryAllScreen(
                                 onToggleLike = {
                                     val next = liked[track.id] ?: !track.isLiked
                                     liked[track.id] = next
+                                    app.cache.invalidateLibrary()
                                     scope.launch {
                                         runCatching {
                                             if (next) app.api.like(track.id) else app.api.unlike(track.id)
@@ -219,6 +250,173 @@ fun LibraryAllScreen(
                                 onOverflow = {},
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showCreate) {
+        ModalBottomSheet(
+            onDismissRequest = { if (!creating) showCreate = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Новый плейлист", style = MaterialTheme.typography.headlineSmall)
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Название") },
+                )
+                OutlinedTextField(
+                    value = newDescription,
+                    onValueChange = { newDescription = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    label = { Text("Описание (необязательно)") },
+                )
+                createError?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { createPlaylist() },
+                        enabled = newName.isNotBlank() && !creating,
+                    ) {
+                        if (creating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text("Создать")
+                        }
+                    }
+                    TextButton(onClick = { if (!creating) showCreate = false }) {
+                        Text("Отмена")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlbumGrid(
+    albums: List<Album>,
+    app: KwhaleApp,
+    miniPlayerBottom: androidx.compose.ui.unit.Dp,
+    onOpenCollection: (String, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (albums.isEmpty()) {
+        EmptyState(
+            "Пока нет альбомов",
+            "Сохраните альбом кнопкой «Добавить» на его экране",
+            modifier = modifier.fillMaxWidth(),
+        )
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier,
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 8.dp,
+            bottom = 24.dp + miniPlayerBottom,
+        ),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(albums, key = { it.id }) { album ->
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                AlbumCard(
+                    album = album,
+                    api = app.api,
+                    onClick = { onOpenCollection("album", album.id) },
+                    width = 150,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistGrid(
+    playlists: List<Playlist>,
+    app: KwhaleApp,
+    miniPlayerBottom: androidx.compose.ui.unit.Dp,
+    onOpenCollection: (String, String) -> Unit,
+    onCreate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (playlists.isEmpty()) {
+        EmptyState(
+            "Пока нет плейлистов",
+            "Создайте первый плейлист и добавьте в него треки",
+            action = "Создать плейлист",
+            onAction = onCreate,
+            modifier = modifier.fillMaxWidth(),
+        )
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier,
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 8.dp,
+            bottom = 24.dp + miniPlayerBottom,
+        ),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(playlists, key = { it.id }) { playlist ->
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                PlaylistCard(
+                    playlist = playlist,
+                    api = app.api,
+                    onClick = { onOpenCollection("playlist", playlist.id) },
+                    width = 150,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryAllSkeleton() {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ShimmerBox(Modifier.width(100.dp).height(32.dp), RoundedCornerShape(8.dp))
+            ShimmerBox(Modifier.width(110.dp).height(32.dp), RoundedCornerShape(8.dp))
+        }
+        Spacer(Modifier.height(16.dp))
+        repeat(3) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                repeat(2) {
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        ShimmerBox(Modifier.fillMaxWidth().height(150.dp), RoundedCornerShape(10.dp))
+                        Spacer(Modifier.height(8.dp))
+                        ShimmerBox(Modifier.fillMaxWidth(0.7f).height(12.dp))
                     }
                 }
             }

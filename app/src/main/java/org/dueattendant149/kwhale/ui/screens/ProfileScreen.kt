@@ -59,6 +59,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.data.ContentCache
+import org.dueattendant149.kwhale.data.ProfileSnapshot
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.download.DownloadStore
 import org.dueattendant149.kwhale.ui.components.CoverArt
@@ -76,15 +78,18 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var name by remember { mutableStateOf(app.api.session()?.user?.displayName ?: "Профиль") }
-    var email by remember { mutableStateOf(app.api.session()?.user?.email ?: "") }
-    var avatar by remember { mutableStateOf<String?>(null) }
+    val cached = remember { app.cache.read(ContentCache.PROFILE, ProfileSnapshot.serializer()) }
+    var name by remember {
+        mutableStateOf(cached?.name ?: app.api.session()?.user?.displayName ?: "Профиль")
+    }
+    var email by remember { mutableStateOf(cached?.email ?: app.api.session()?.user?.email ?: "") }
+    var avatar by remember { mutableStateOf(cached?.avatar) }
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
-    var trackCount by remember { mutableStateOf(0) }
-    var playlistCount by remember { mutableStateOf(0) }
-    var downloadCount by remember { mutableStateOf(0) }
-    var enrichments by remember { mutableStateOf<List<EnrichmentProposal>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    var trackCount by remember { mutableStateOf(cached?.trackCount ?: 0) }
+    var playlistCount by remember { mutableStateOf(cached?.playlistCount ?: 0) }
+    var downloadCount by remember { mutableStateOf(cached?.downloadCount ?: 0) }
+    var enrichments by remember { mutableStateOf(cached?.enrichments.orEmpty()) }
+    var loading by remember { mutableStateOf(cached == null) }
 
     val uploadLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -110,6 +115,10 @@ fun ProfileScreen(
     }
 
     LaunchedEffect(Unit) {
+        if (cached != null && app.cache.isFresh(ContentCache.PROFILE, 60_000)) {
+            loading = false
+            return@LaunchedEffect
+        }
         runCatching { app.api.me() }.onSuccess { me ->
             name = me.displayName
             email = me.email.orEmpty()
@@ -119,6 +128,19 @@ fun ProfileScreen(
         playlistCount = runCatching { app.api.libraryPlaylists(limit = 1).total }.getOrNull() ?: 0
         downloadCount = DownloadStore(context).all().count { it.file().exists() }
         enrichments = runCatching { app.api.enrichments().items }.getOrDefault(emptyList())
+        app.cache.write(
+            ContentCache.PROFILE,
+            ProfileSnapshot.serializer(),
+            ProfileSnapshot(
+                name = name,
+                email = email,
+                avatar = avatar,
+                trackCount = trackCount,
+                playlistCount = playlistCount,
+                downloadCount = downloadCount,
+                enrichments = enrichments,
+            ),
+        )
         loading = false
     }
 
@@ -192,13 +214,19 @@ fun ProfileScreen(
                     onConfirm = {
                         scope.launch {
                             runCatching { app.api.confirmEnrichment(prop.id) }
-                                .onSuccess { enrichments = enrichments.filterNot { it.id == prop.id } }
+                                .onSuccess {
+                                    enrichments = enrichments.filterNot { it.id == prop.id }
+                                    app.cache.invalidateProfile()
+                                }
                         }
                     },
                     onReject = {
                         scope.launch {
                             runCatching { app.api.rejectEnrichment(prop.id) }
-                                .onSuccess { enrichments = enrichments.filterNot { it.id == prop.id } }
+                                .onSuccess {
+                                    enrichments = enrichments.filterNot { it.id == prop.id }
+                                    app.cache.invalidateProfile()
+                                }
                         }
                     },
                 )

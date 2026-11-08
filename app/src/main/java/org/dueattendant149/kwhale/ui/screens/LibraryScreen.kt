@@ -40,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.data.ContentCache
+import org.dueattendant149.kwhale.data.LibrarySnapshot
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
@@ -64,10 +66,11 @@ fun LibraryScreen(
     onDownloads: () -> Unit,
     onSearch: () -> Unit = {},
 ) {
-    var tracks by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
-    var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
-    var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    val cached = remember { app.cache.read(ContentCache.LIBRARY, LibrarySnapshot.serializer()) }
+    var tracks by remember { mutableStateOf(cached?.tracks.orEmpty()) }
+    var playlists by remember { mutableStateOf(cached?.playlists.orEmpty()) }
+    var albums by remember { mutableStateOf(cached?.albums.orEmpty()) }
+    var loading by remember { mutableStateOf(cached == null) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
@@ -75,7 +78,11 @@ fun LibraryScreen(
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     LaunchedEffect(reload) {
-        loading = true
+        if (reload == 0 && cached != null && app.cache.isFresh(ContentCache.LIBRARY, 30_000)) {
+            loading = false
+            return@LaunchedEffect
+        }
+        loading = cached == null
         error = null
         runCatching {
             val tracksPage = app.api.libraryTracks(limit = 100)
@@ -84,6 +91,11 @@ fun LibraryScreen(
             tracks = tracksPage.items
             playlists = playlistsPage.items
             albums = albumsPage.items
+            app.cache.write(
+                ContentCache.LIBRARY,
+                LibrarySnapshot.serializer(),
+                LibrarySnapshot(tracksPage.items, playlistsPage.items, albumsPage.items),
+            )
         }.onFailure { error = it.message ?: "Ошибка сети" }
         loading = false
     }
@@ -196,6 +208,7 @@ fun LibraryScreen(
                     onToggleLike = {
                         val next = liked[track.id] ?: !track.isLiked
                         liked[track.id] = next
+                        app.cache.invalidateLibrary()
                         scope.launch {
                             runCatching {
                                 if (next) app.api.like(track.id) else app.api.unlike(track.id)

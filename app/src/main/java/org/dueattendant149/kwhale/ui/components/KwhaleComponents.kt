@@ -64,8 +64,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.compose.SubcomposeAsyncImageContent
+import coil.compose.AsyncImage
 import org.dueattendant149.kwhale.design.KwhaleCoverPalette
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
@@ -195,14 +194,13 @@ fun CoverArt(
         }
 
         if (!imageUrl.isNullOrBlank()) {
-            SubcomposeAsyncImage(
+            // The gradient plate is already painted; AsyncImage simply draws
+            // over it when the bitmap arrives. No subcomposition per row.
+            AsyncImage(
                 model = imageUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
-                loading = { Box(Modifier.matchParentSize()) },
-                error = { Box(Modifier.matchParentSize()) },
-                success = { SubcomposeAsyncImageContent() },
             )
         }
     }
@@ -719,16 +717,13 @@ fun BlurredCoverBackground(
     val gradient = remember(seed, dark) { KwhaleCoverPalette.gradient(seed, dark) }
     Box(modifier.fillMaxSize()) {
         if (!imageUrl.isNullOrBlank()) {
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = imageUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(48.dp),
-                loading = { Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient))) },
-                error = { Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient))) },
-                success = { SubcomposeAsyncImageContent() },
+                    .blur(24.dp),
             )
         } else {
             Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient)))

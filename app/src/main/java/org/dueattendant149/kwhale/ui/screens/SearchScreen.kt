@@ -50,6 +50,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.data.ContentCache
+import org.dueattendant149.kwhale.data.SearchBootstrapSnapshot
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
@@ -72,11 +74,12 @@ fun SearchScreen(
     onOpenCollection: (String, String) -> Unit,
     onTrackMenu: (ApiTrack) -> Unit,
 ) {
+    val cached = remember { app.cache.read(ContentCache.SEARCH_BOOTSTRAP, SearchBootstrapSnapshot.serializer()) }
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<SearchResponse?>(null) }
-    var history by remember { mutableStateOf<List<String>>(emptyList()) }
-    var genres by remember { mutableStateOf<List<org.dueattendant149.kwhale.network.model.Genre>>(emptyList()) }
-    var topArtists by remember { mutableStateOf<List<org.dueattendant149.kwhale.network.model.Artist>>(emptyList()) }
+    var history by remember { mutableStateOf(cached?.history.orEmpty()) }
+    var genres by remember { mutableStateOf(cached?.genres.orEmpty()) }
+    var topArtists by remember { mutableStateOf(cached?.artists.orEmpty()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var searchTick by remember { mutableStateOf(0) }
@@ -86,9 +89,18 @@ fun SearchScreen(
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     LaunchedEffect(Unit) {
-        history = runCatching { app.api.searchHistory().items }.getOrDefault(emptyList())
-        genres = runCatching { app.api.genres().items }.getOrDefault(emptyList())
-        topArtists = runCatching { app.api.topArtists(limit = 12).items }.getOrDefault(emptyList())
+        if (cached != null && app.cache.isFresh(ContentCache.SEARCH_BOOTSTRAP, 60_000)) return@LaunchedEffect
+        val nextHistory = runCatching { app.api.searchHistory().items }.getOrDefault(emptyList())
+        val nextGenres = runCatching { app.api.genres().items }.getOrDefault(emptyList())
+        val nextArtists = runCatching { app.api.topArtists(limit = 12).items }.getOrDefault(emptyList())
+        history = nextHistory
+        genres = nextGenres
+        topArtists = nextArtists
+        app.cache.write(
+            ContentCache.SEARCH_BOOTSTRAP,
+            SearchBootstrapSnapshot.serializer(),
+            SearchBootstrapSnapshot(nextHistory, nextGenres, nextArtists),
+        )
     }
 
     LaunchedEffect(query, searchTick) {
@@ -108,6 +120,7 @@ fun SearchScreen(
             // wave stayed on screen forever.
             val quick = app.api.search(query.trim(), limit = 30, wait = false)
             results = quick
+            app.cache.invalidateSearchBootstrap()
             loading = false
             if (quick.partial) {
                 try {

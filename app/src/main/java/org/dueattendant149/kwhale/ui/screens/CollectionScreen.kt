@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -32,15 +34,21 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +66,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.data.CollectionSnapshot
+import org.dueattendant149.kwhale.data.ContentCache
+import org.dueattendant149.kwhale.data.LibrarySnapshot
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
@@ -72,6 +83,7 @@ import org.dueattendant149.kwhale.ui.components.SectionHeader
 import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import org.dueattendant149.kwhale.ui.components.TrackRow
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
+import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.components.imageUrl
 
 @Composable
@@ -83,31 +95,40 @@ fun CollectionScreen(
     onOpenCollection: (String, String) -> Unit,
     onTrackMenu: (ApiTrack) -> Unit,
 ) {
-    var title by remember { mutableStateOf("") }
-    var subtitle by remember { mutableStateOf("") }
-    var meta by remember { mutableStateOf("") }
-    var cover by remember { mutableStateOf<String?>(null) }
-    var tracks by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
-    var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
-    var canEdit by remember { mutableStateOf(false) }
+    val cacheKey = ContentCache.collection(kind, collectionId)
+    val cached = remember(kind, collectionId) {
+        app.cache.read(cacheKey, CollectionSnapshot.serializer())
+    }
+    var title by remember { mutableStateOf(cached?.title.orEmpty()) }
+    var subtitle by remember { mutableStateOf(cached?.subtitle.orEmpty()) }
+    var meta by remember { mutableStateOf(cached?.meta.orEmpty()) }
+    var cover by remember { mutableStateOf(cached?.cover) }
+    var tracks by remember { mutableStateOf(cached?.tracks.orEmpty()) }
+    var albums by remember { mutableStateOf(cached?.albums.orEmpty()) }
+    var canEdit by remember { mutableStateOf(cached?.canEdit ?: false) }
     var showMenu by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var showAddTracks by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
+    var loading by remember { mutableStateOf(cached == null) }
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
-    var isFavorite by remember { mutableStateOf(false) }
-    var isFollowed by remember { mutableStateOf(false) }
-    var isOwned by remember { mutableStateOf(false) }
+    var isFavorite by remember { mutableStateOf(cached?.isFavorite ?: false) }
+    var isFollowed by remember { mutableStateOf(cached?.isFollowed ?: false) }
+    var isOwned by remember { mutableStateOf(cached?.isOwned ?: false) }
     var actionBusy by remember { mutableStateOf(false) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     LaunchedEffect(kind, collectionId, reload) {
-        loading = true
+        if (reload == 0 && cached != null && app.cache.isFresh(cacheKey, 30_000)) {
+            loading = false
+            return@LaunchedEffect
+        }
+        loading = cached == null
         error = null
         runCatching {
             when (kind) {
@@ -144,7 +165,25 @@ fun CollectionScreen(
                 }
                 else -> error("Неизвестная коллекция")
             }
-        }.onFailure { error = it.message ?: "Ошибка сети" }
+            app.cache.write(
+                cacheKey,
+                CollectionSnapshot.serializer(),
+                CollectionSnapshot(
+                    title = title,
+                    subtitle = subtitle,
+                    meta = meta,
+                    cover = cover,
+                    tracks = tracks,
+                    albums = albums,
+                    canEdit = canEdit,
+                    isFavorite = isFavorite,
+                    isFollowed = isFollowed,
+                    isOwned = isOwned,
+                ),
+            )
+        }.onFailure {
+            if (cached == null) error = it.message ?: "Ошибка сети"
+        }
         loading = false
     }
 
@@ -161,6 +200,7 @@ fun CollectionScreen(
                 }
             }.onSuccess {
                 if (kind == "playlist") isFollowed = !saved else isFavorite = !saved
+                app.cache.invalidateCollection(kind, collectionId)
                 Toast.makeText(
                     context,
                     if (saved) "Убрано из библиотеки" else "Сохранено в библиотеку",
@@ -184,6 +224,7 @@ fun CollectionScreen(
                     else -> error("unsupported kind")
                 }
             }.onSuccess { result ->
+                app.cache.invalidateCollection(kind, collectionId)
                 val total = result.liked + result.alreadyLiked
                 val suffix = if (result.failed > 0) ", ошибок: ${result.failed}" else ""
                 Toast.makeText(
@@ -311,7 +352,14 @@ fun CollectionScreen(
                         .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    if (!(kind == "playlist" && isOwned)) {
+                    if (kind == "playlist" && isOwned) {
+                        ActionItem(
+                            icon = Icons.Rounded.Add,
+                            label = "Добавить треки",
+                            enabled = !actionBusy,
+                            onClick = { showAddTracks = true },
+                        )
+                    } else {
                         ActionItem(
                             icon = if (saved) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                             label = if (saved) "Добавлено" else "Добавить",
@@ -374,6 +422,7 @@ fun CollectionScreen(
                     onToggleLike = {
                         val next = liked[track.id] ?: !track.isLiked
                         liked[track.id] = next
+                        app.cache.invalidateCollection(kind, collectionId)
                         scope.launch {
                             runCatching {
                                 if (next) app.api.like(track.id) else app.api.unlike(track.id)
@@ -401,6 +450,21 @@ fun CollectionScreen(
         }
     }
 
+    if (showAddTracks) {
+        AddTracksSheet(
+            app = app,
+            playlistId = collectionId,
+            existingIds = tracks.map { it.id }.toSet(),
+            onDismiss = { showAddTracks = false },
+            onAdded = { added ->
+                tracks = (tracks + added).distinctBy { it.id }
+                app.cache.invalidateCollection(kind, collectionId)
+                app.cache.invalidateLibrary()
+                showAddTracks = false
+            },
+        )
+    }
+
     if (showRename) {
         AlertDialog(
             onDismissRequest = { showRename = false },
@@ -421,6 +485,8 @@ fun CollectionScreen(
                             app.api.updatePlaylist(collectionId, PlaylistUpdate(title = renameText))
                         }.onSuccess {
                             title = renameText
+                            app.cache.invalidateCollection(kind, collectionId)
+                            app.cache.invalidateLibrary()
                             reload++
                         }
                     }
@@ -441,7 +507,11 @@ fun CollectionScreen(
                 TextButton(onClick = {
                     showDelete = false
                     scope.launch {
-                        runCatching { app.api.deletePlaylist(collectionId) }.onSuccess { onBack() }
+                        runCatching { app.api.deletePlaylist(collectionId) }.onSuccess {
+                        app.cache.invalidateCollection(kind, collectionId)
+                        app.cache.invalidateLibrary()
+                        onBack()
+                    }
                     }
                 }) { Text("Удалить") }
             },
@@ -529,5 +599,151 @@ private fun CollectionSkeleton() {
         }
         Spacer(Modifier.size(16.dp))
         repeat(6) { TrackRowSkeleton() }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun AddTracksSheet(
+    app: KwhaleApp,
+    playlistId: String,
+    existingIds: Set<String>,
+    onDismiss: () -> Unit,
+    onAdded: (List<ApiTrack>) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val cached = remember {
+        app.cache.read(ContentCache.LIBRARY, LibrarySnapshot.serializer())?.tracks.orEmpty()
+    }
+    var all by remember { mutableStateOf(cached) }
+    var loading by remember { mutableStateOf(all.isEmpty()) }
+    var query by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var saving by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        if (all.isNotEmpty() && app.cache.isFresh(ContentCache.LIBRARY, 30_000)) {
+            loading = false
+            return@LaunchedEffect
+        }
+        val fresh = runCatching { app.api.libraryTracks(limit = 200).items }
+            .getOrDefault(emptyList())
+        if (fresh.isNotEmpty()) all = fresh
+        loading = false
+    }
+
+    val filtered = all.filter { track ->
+        track.id !in existingIds && (
+            query.isBlank() ||
+                track.title.contains(query.trim(), ignoreCase = true) ||
+                track.artistLine().contains(query.trim(), ignoreCase = true)
+            )
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = { if (!saving) onDismiss() },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Добавить треки", style = MaterialTheme.typography.headlineSmall)
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Поиск в библиотеке") },
+            )
+            when {
+                loading -> Box(
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    contentAlignment = Alignment.Center,
+                ) { CircularProgressIndicator() }
+                filtered.isEmpty() -> Text(
+                    if (all.isEmpty()) "В библиотеке пока нет треков" else "Ничего не найдено",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 20.dp),
+                )
+                else -> LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
+                    items(filtered, key = { it.id }) { track ->
+                        val checked = track.id in selected
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    track.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    track.artistLine(),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            leadingContent = {
+                                CoverArt(
+                                    imageUrl = track.imageUrl(app.api, size = "sm"),
+                                    modifier = Modifier.size(44.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    seed = track.title,
+                                )
+                            },
+                            trailingContent = {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = {
+                                        selected = if (checked) selected - track.id else selected + track.id
+                                    },
+                                )
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            modifier = Modifier.clickable {
+                                selected = if (checked) selected - track.id else selected + track.id
+                            },
+                        )
+                    }
+                }
+            }
+            Button(
+                onClick = {
+                    if (selected.isEmpty() || saving) return@Button
+                    saving = true
+                    scope.launch {
+                        runCatching { app.api.addPlaylistTracks(playlistId, selected.toList()) }
+                            .onSuccess { playlist ->
+                                val added = playlist.tracks
+                                    .filter { it.id in selected }
+                                    .ifEmpty { all.filter { it.id in selected } }
+                                Toast.makeText(
+                                    context,
+                                    "Добавлено треков: ${added.size}",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                                onAdded(added)
+                            }
+                            .onFailure {
+                                Toast.makeText(
+                                    context,
+                                    "Не удалось добавить треки",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        saving = false
+                    }
+                },
+                enabled = selected.isNotEmpty() && !saving,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (selected.isEmpty()) "Выберите треки" else "Добавить (${selected.size})")
+            }
+        }
     }
 }

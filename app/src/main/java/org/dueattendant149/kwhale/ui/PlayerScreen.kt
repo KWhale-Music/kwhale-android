@@ -78,8 +78,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.SubcomposeAsyncImage
-import coil.compose.SubcomposeAsyncImageContent
+import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.KwhaleCoverPalette
@@ -516,16 +515,13 @@ private fun PlayerBackground(coverUrl: String?, seed: String, isLight: Boolean) 
     val gradient = remember(seed, isLight) { KwhaleCoverPalette.gradient(seed, isLight) }
     Box(Modifier.fillMaxSize()) {
         if (!coverUrl.isNullOrBlank()) {
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = coverUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(56.dp),
-                loading = { Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient))) },
-                error = { Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient))) },
-                success = { SubcomposeAsyncImageContent() },
+                    .blur(32.dp),
             )
         } else {
             Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient)))

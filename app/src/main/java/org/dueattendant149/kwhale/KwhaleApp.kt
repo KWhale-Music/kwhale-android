@@ -5,6 +5,7 @@ import android.provider.Settings
 import androidx.glance.appwidget.updateAll
 import coil.Coil
 import coil.ImageLoader
+import coil.disk.DiskCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.dueattendant149.kwhale.analytics.EventTracker
+import org.dueattendant149.kwhale.data.ContentCache
 import org.dueattendant149.kwhale.download.DownloadStore
 import org.dueattendant149.kwhale.network.ApiConfig
 import org.dueattendant149.kwhale.network.ApiFactory
@@ -39,10 +41,14 @@ class KwhaleApp : Application() {
     lateinit var api: KwhaleApi
         private set
 
+    lateinit var cache: ContentCache
+        private set
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
+        cache = ContentCache(this)
         settings = SettingsStore(this)
         downloads = DownloadStore(this)
         initApiAndEvents(settings.apiBaseUrl)
@@ -77,6 +83,12 @@ class KwhaleApp : Application() {
                 .okHttpClient {
                     OkHttpClient.Builder()
                         .addInterceptor(HostPolicyInterceptor(api.config.baseHost))
+                        .build()
+                }
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(cacheDir.resolve("image_cache"))
+                        .maxSizeBytes(256L * 1024 * 1024)
                         .build()
                 }
                 .build(),
