@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +62,7 @@ import org.dueattendant149.kwhale.ui.components.CoverArt
 import org.dueattendant149.kwhale.ui.components.PlaylistCard
 import org.dueattendant149.kwhale.ui.components.SectionHeader
 import org.dueattendant149.kwhale.ui.components.TrackRow
+import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.components.imageUrl
 
@@ -206,8 +206,13 @@ fun SearchScreen(
             }
         } else {
             if (loading) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                ) {
+                    repeat(5) { TrackRowSkeleton() }
                 }
             } else {
                 val data = results
@@ -255,10 +260,11 @@ fun SearchScreen(
                         }
                         if (tracks.isNotEmpty()) {
                             item { SectionHeader("Треки") }
-                            itemsIndexed(tracks) { index, track ->
+                            itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                                 TrackRow(
                                     track = track,
                                     api = app.api,
+                                    modifier = Modifier.animateItem(),
                                     liked = liked[track.id] ?: track.isLiked,
                                     onClick = {
                                         app.player.playQueue(tracks.map { it.toUi(app.api) }, index)

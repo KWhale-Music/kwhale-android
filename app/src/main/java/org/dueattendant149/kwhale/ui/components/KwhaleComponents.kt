@@ -2,13 +2,19 @@ package org.dueattendant149.kwhale.ui.components
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +40,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,7 +70,6 @@ import coil.compose.SubcomposeAsyncImageContent
 import org.dueattendant149.kwhale.design.KwhaleCoverPalette
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
-import org.dueattendant149.kwhale.model.Track as UiTrack
 import org.dueattendant149.kwhale.network.KwhaleApi
 import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.Artist
@@ -120,6 +124,29 @@ fun Artist.coverSeed(): String = name
 
 @Composable
 private fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
+/**
+ * Subtle press feedback shared by rows and cards.
+ *
+ * The ripple alone is easy to miss on a dense list; a 3% scale makes the
+ * touch target feel physical without the "bouncy toy" effect.
+ */
+@Composable
+fun Modifier.pressScale(interactionSource: MutableInteractionSource): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium,
+        ),
+        label = "pressScale",
+    )
+    return graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
 
 /**
  * Cover thumbnail with a designed fallback.
@@ -311,11 +338,17 @@ fun TrackRow(
     isCurrent: Boolean = false,
 ) {
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = modifier
+            .pressScale(interaction)
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            )
             .padding(vertical = KwhaleSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -423,11 +456,17 @@ fun TrackTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
+            .pressScale(interaction)
             .width(132.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            ),
     ) {
         CoverArt(
             imageUrl = track.imageUrl(api),
@@ -485,11 +524,17 @@ fun AlbumCard(
     width: Int = 140,
     seed: String = "",
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
+            .pressScale(interaction)
             .width(width.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            ),
     ) {
         CoverArt(
             imageUrl = coverUrl,
@@ -526,11 +571,17 @@ fun PlaylistCard(
     modifier: Modifier = Modifier,
     width: Int = 140,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
+            .pressScale(interaction)
             .width(width.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            ),
     ) {
         CoverArt(
             imageUrl = playlist.imageUrl(api),
@@ -566,11 +617,17 @@ fun ArtistCard(
     modifier: Modifier = Modifier,
     size: Int = 96,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
+            .pressScale(interaction)
             .width(size.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CoverArt(
@@ -589,83 +646,6 @@ fun ArtistCard(
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-@Composable
-fun ContinueCard(
-    track: UiTrack,
-    progress: Float,
-    isPlaying: Boolean,
-    onOpen: () -> Unit,
-    onToggle: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpen),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(KwhaleSpacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CoverArt(
-                imageUrl = track.coverUrl,
-                modifier = Modifier.size(88.dp),
-                shape = RoundedCornerShape(14.dp),
-                iconSize = 28,
-                seed = track.title,
-            )
-            Spacer(Modifier.width(KwhaleSpacing.sm))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = "Продолжить",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = track.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(KwhaleSpacing.xs))
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(CircleShape),
-                )
-            }
-            Spacer(Modifier.width(KwhaleSpacing.xs))
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    .clickable(onClick = onToggle),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (isPlaying) "Пауза" else "Играть",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                )
-            }
-        }
     }
 }
 

@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -31,7 +32,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -69,7 +69,9 @@ import org.dueattendant149.kwhale.ui.components.BlurredCoverBackground
 import org.dueattendant149.kwhale.ui.components.CoverArt
 import org.dueattendant149.kwhale.ui.components.ErrorState
 import org.dueattendant149.kwhale.ui.components.SectionHeader
+import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import org.dueattendant149.kwhale.ui.components.TrackRow
+import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 import org.dueattendant149.kwhale.ui.components.imageUrl
 
 @Composable
@@ -199,9 +201,7 @@ fun CollectionScreen(
     Box(Modifier.fillMaxSize()) {
         BlurredCoverBackground(cover)
         if (loading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            CollectionSkeleton()
             return@Box
         }
         if (error != null) {
@@ -368,6 +368,7 @@ fun CollectionScreen(
                 TrackRow(
                     track = track,
                     api = app.api,
+                    modifier = Modifier.animateItem(),
                     liked = liked[track.id] ?: track.isLiked,
                     onClick = { app.player.playQueue(tracks.map { it.toUi(app.api) }, index) },
                     onToggleLike = {
@@ -475,5 +476,58 @@ private fun ActionItem(
             ),
             maxLines = 1,
         )
+    }
+}
+
+@Composable
+private fun CollectionSkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ShimmerBox(Modifier.size(24.dp), CircleShape)
+            Spacer(Modifier.weight(1f))
+            ShimmerBox(Modifier.size(24.dp), CircleShape)
+        }
+        Spacer(Modifier.size(8.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            ShimmerBox(Modifier.size(180.dp), RoundedCornerShape(12.dp))
+            Spacer(Modifier.size(14.dp))
+            ShimmerBox(Modifier.width(220.dp).height(26.dp))
+            Spacer(Modifier.size(8.dp))
+            ShimmerBox(Modifier.width(130.dp).height(16.dp))
+        }
+        Spacer(Modifier.size(16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            repeat(2) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    ShimmerBox(Modifier.size(24.dp), CircleShape)
+                    Spacer(Modifier.size(6.dp))
+                    ShimmerBox(Modifier.width(64.dp).height(12.dp))
+                }
+            }
+        }
+        Spacer(Modifier.size(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ShimmerBox(Modifier.weight(1f).height(40.dp), RoundedCornerShape(20.dp))
+            ShimmerBox(Modifier.weight(1f).height(40.dp), RoundedCornerShape(20.dp))
+        }
+        Spacer(Modifier.size(16.dp))
+        repeat(6) { TrackRowSkeleton() }
     }
 }

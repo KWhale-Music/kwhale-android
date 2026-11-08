@@ -4,14 +4,17 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -185,26 +188,57 @@ fun KwhaleRoot(
                     }
                 },
             ) { innerPadding ->
-        // Cross-fade + subtle scale on route changes. Tab switches stay instant
-        // (no slide) so the bottom bar does not feel like it flickers.
-        val navTransition = fadeIn(
-            animationSpec = tween(KwhaleMotion.durationStd, easing = KwhaleMotion.emphasizedDecelerate),
-        ) + scaleIn(
-            initialScale = 0.98f,
-            animationSpec = tween(KwhaleMotion.durationStd, easing = KwhaleMotion.emphasizedDecelerate),
+        // Two different motions:
+        //  * tab → tab: fade-through (quick exit, calm enter), no slide/scale;
+        //  * tab → detail: a short horizontal push so hierarchy is obvious.
+        fun isTab(entry: androidx.navigation.NavBackStackEntry?): Boolean =
+            entry?.destination?.route?.let { it in tabRoutes } == true
+
+        val calmEnter = fadeIn(
+            tween(KwhaleMotion.durationStd, easing = KwhaleMotion.emphasizedDecelerate),
         )
-        val navExit = fadeOut(
+        val quickExit = fadeOut(
+            tween(KwhaleMotion.durationFast, easing = KwhaleMotion.emphasizedAccelerate),
+        )
+        val pushEnter = slideInHorizontally(
+            animationSpec = tween(
+                KwhaleMotion.durationEmphasized,
+                easing = KwhaleMotion.emphasizedDecelerate,
+            ),
+            initialOffsetX = { it / 10 },
+        ) + calmEnter
+        val pushExit = slideOutHorizontally(
             animationSpec = tween(KwhaleMotion.durationFast, easing = KwhaleMotion.emphasizedAccelerate),
-        )
+            targetOffsetX = { it / 14 },
+        ) + quickExit
+        val popEnter = slideInHorizontally(
+            animationSpec = tween(
+                KwhaleMotion.durationStd,
+                easing = KwhaleMotion.emphasizedDecelerate,
+            ),
+            initialOffsetX = { -it / 10 },
+        ) + calmEnter
+        val popExit = slideOutHorizontally(
+            animationSpec = tween(KwhaleMotion.durationFast, easing = KwhaleMotion.emphasizedAccelerate),
+            targetOffsetX = { it / 10 },
+        ) + quickExit
 
         NavHost(
             navController = navController,
             startDestination = "home",
             modifier = Modifier.padding(innerPadding),
-            enterTransition = { navTransition },
-            exitTransition = { navExit },
-            popEnterTransition = { navTransition },
-            popExitTransition = { navExit },
+            enterTransition = {
+                if (isTab(initialState) && isTab(targetState)) calmEnter else pushEnter
+            },
+            exitTransition = {
+                if (isTab(initialState) && isTab(targetState)) quickExit else pushExit
+            },
+            popEnterTransition = {
+                if (isTab(initialState) && isTab(targetState)) calmEnter else popEnter
+            },
+            popExitTransition = {
+                if (isTab(initialState) && isTab(targetState)) quickExit else popExit
+            },
         ) {
             composable("home") {
                 HomeScreen(
@@ -419,6 +453,14 @@ private fun MiniPlayer(
 ) {
     if (track == null) return
 
+    // The player emits progress once per second; animate between ticks so the
+    // hairline does not visibly jump.
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 900, easing = LinearEasing),
+        label = "miniProgress",
+    )
+
     // Slides in when a queue starts instead of popping into place.
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
     AnimatedVisibility(
@@ -451,7 +493,7 @@ private fun MiniPlayer(
         ) {
             Column {
                 LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
+                    progress = { animatedProgress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(2.dp),

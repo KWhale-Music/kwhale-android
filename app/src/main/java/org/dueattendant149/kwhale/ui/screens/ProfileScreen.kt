@@ -36,7 +36,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -63,6 +62,7 @@ import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.download.DownloadStore
 import org.dueattendant149.kwhale.ui.components.CoverArt
+import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import java.io.File
 
 @Composable
@@ -123,9 +123,7 @@ fun ProfileScreen(
     }
 
     if (loading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        ProfileSkeleton()
         return
     }
 
@@ -319,6 +317,48 @@ private fun EnrichmentCard(
                 Button(onClick = onConfirm) { Text("Подтвердить") }
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = onReject) { Text("Отклонить") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileSkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+    ) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ShimmerBox(Modifier.size(88.dp), CircleShape)
+        }
+        Spacer(Modifier.size(12.dp))
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ShimmerBox(Modifier.width(170.dp).height(26.dp))
+        }
+        Spacer(Modifier.size(8.dp))
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ShimmerBox(Modifier.width(210.dp).height(14.dp))
+        }
+        Spacer(Modifier.size(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            repeat(3) {
+                ShimmerBox(Modifier.width(72.dp).height(40.dp))
+            }
+        }
+        Spacer(Modifier.size(28.dp))
+        repeat(6) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ShimmerBox(Modifier.size(24.dp), CircleShape)
+                Spacer(Modifier.size(14.dp))
+                ShimmerBox(Modifier.width(150.dp).height(16.dp))
             }
         }
     }

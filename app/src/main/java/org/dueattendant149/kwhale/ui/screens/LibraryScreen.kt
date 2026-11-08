@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,12 +17,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,11 +47,13 @@ import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
+import org.dueattendant149.kwhale.ui.components.CardCarouselSkeleton
 import org.dueattendant149.kwhale.ui.components.EmptyState
 import org.dueattendant149.kwhale.ui.components.ErrorState
-import org.dueattendant149.kwhale.ui.components.PlaylistCard
 import org.dueattendant149.kwhale.ui.components.SectionHeader
+import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import org.dueattendant149.kwhale.ui.components.TrackRow
+import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 
 @Composable
 fun LibraryScreen(
@@ -86,9 +89,7 @@ fun LibraryScreen(
     }
 
     if (loading && tracks.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        LibrarySkeleton()
         return
     }
     if (error != null && tracks.isEmpty()) {
@@ -189,6 +190,7 @@ fun LibraryScreen(
                 TrackRow(
                     track = track,
                     api = app.api,
+                    modifier = Modifier.animateItem(),
                     liked = liked[track.id] ?: track.isLiked,
                     onClick = { app.player.playQueue(tracks.map { it.toUi(app.api) }, index) },
                     onToggleLike = {
@@ -213,5 +215,29 @@ fun LibraryScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LibrarySkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ShimmerBox(Modifier.width(150.dp).height(30.dp))
+            Spacer(Modifier.weight(1f))
+            ShimmerBox(Modifier.size(40.dp), CircleShape)
+        }
+        Spacer(Modifier.size(24.dp))
+        ShimmerBox(Modifier.width(140.dp).height(22.dp))
+        Spacer(Modifier.size(10.dp))
+        CardCarouselSkeleton(cardWidth = 140, count = 3)
+        Spacer(Modifier.size(24.dp))
+        ShimmerBox(Modifier.width(170.dp).height(22.dp))
+        Spacer(Modifier.size(10.dp))
+        repeat(6) { TrackRowSkeleton() }
     }
 }

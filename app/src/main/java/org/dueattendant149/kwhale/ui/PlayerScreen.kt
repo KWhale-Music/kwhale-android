@@ -5,6 +5,7 @@ import android.media.audiofx.AudioEffect
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -110,6 +111,11 @@ fun PlayerScreen(
     var liked by remember(track.id, track.isLiked) { mutableStateOf(track.isLiked) }
     var disliked by remember(track.id, track.isDisliked) { mutableStateOf(track.isDisliked) }
     var dragValue by remember { mutableStateOf<Float?>(null) }
+    val smoothedProgress by animateFloatAsState(
+        targetValue = state.progress,
+        animationSpec = tween(durationMillis = 900, easing = LinearEasing),
+        label = "playerProgress",
+    )
 
     val likedScale by animateFloatAsState(
         targetValue = if (liked) 1.15f else 1f,
@@ -305,7 +311,7 @@ fun PlayerScreen(
             Spacer(Modifier.height(KwhaleSpacing.sm))
 
             // ── progress ─────────────────────────────────────────────────────
-            val sliderValue = dragValue ?: state.progress
+            val sliderValue = dragValue ?: smoothedProgress
             Slider(
                 value = sliderValue,
                 onValueChange = { dragValue = it },
@@ -376,12 +382,20 @@ fun PlayerScreen(
                         .clickable(onClick = app.player::toggle),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (state.isPlaying) "Пауза" else "Играть",
-                        tint = if (isLight) accent else Color.Black,
-                        modifier = Modifier.size(34.dp),
-                    )
+                    AnimatedContent(
+                        targetState = state.isPlaying,
+                        transitionSpec = {
+                            fadeIn(tween(120)) togetherWith fadeOut(tween(80))
+                        },
+                        label = "playPause",
+                    ) { playing ->
+                        Icon(
+                            imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (playing) "Пауза" else "Играть",
+                            tint = if (isLight) accent else Color.Black,
+                            modifier = Modifier.size(34.dp),
+                        )
+                    }
                 }
                 IconButton(onClick = app.player::next, modifier = Modifier.size(48.dp)) {
                     Icon(
