@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DEBUG-ONLY override: dev builds may talk cleartext to ANY host (LAN IPs,
+     adb-reverse loopback, emulator). The release config (src/main) keeps
+     HTTPS-only with a narrow localhost/LAN whitelist. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
