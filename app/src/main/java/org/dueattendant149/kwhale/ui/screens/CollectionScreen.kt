@@ -444,7 +444,7 @@ fun CollectionScreen(
                     number = index + 1,
                 )
             }
-            if (albums.isNotEmpty()) {
+            if (albums.isNotEmpty() || kind == "artist") {
                 item {
                     SectionHeader(
                         title = "Альбомы",
@@ -456,14 +456,16 @@ fun CollectionScreen(
                         },
                     )
                 }
-                item {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(albums, key = { it.id }) { album ->
-                            AlbumCard(
-                                album = album,
-                                api = app.api,
-                                onClick = { onOpenCollection("album", album.id) },
-                            )
+                if (albums.isNotEmpty()) {
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(albums, key = { it.id }) { album ->
+                                AlbumCard(
+                                    album = album,
+                                    api = app.api,
+                                    onClick = { onOpenCollection("album", album.id) },
+                                )
+                            }
                         }
                     }
                 }
