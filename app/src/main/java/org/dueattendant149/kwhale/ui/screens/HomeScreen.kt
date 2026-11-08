@@ -73,6 +73,7 @@ import org.dueattendant149.kwhale.ui.components.TrackTile
 import org.dueattendant149.kwhale.ui.components.imageUrl
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 
 @Composable
 fun HomeScreen(
@@ -180,9 +181,15 @@ fun HomeScreen(
             promptLoading = false
         }
     }
+    val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 12.dp,
+            bottom = 28.dp + miniPlayerBottom,
+        ),
     ) {
         item {
             Row(

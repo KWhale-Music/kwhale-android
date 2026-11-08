@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.download.DownloadStore
 import org.dueattendant149.kwhale.download.DownloadedTrack
 import org.dueattendant149.kwhale.model.Track
@@ -49,6 +50,7 @@ fun DownloadsScreen(
 ) {
     val context = LocalContext.current
     var items by remember { mutableStateOf<List<DownloadedTrack>>(emptyList()) }
+    val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     LaunchedEffect(Unit) {
         items = DownloadStore(context).all().filter { it.file().exists() }
@@ -85,7 +87,7 @@ fun DownloadsScreen(
         }
         LazyColumn(
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
         ) {
             items(items, key = { it.remoteId }) { item ->
                 ListItem(

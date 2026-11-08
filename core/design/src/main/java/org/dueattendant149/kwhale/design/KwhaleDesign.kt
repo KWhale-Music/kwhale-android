@@ -4,6 +4,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -39,6 +40,9 @@ object KwhaleSpacing {
     val miniPlayer = 72.dp
     val navBar = 80.dp
 }
+
+/** Extra bottom padding scroll lists should reserve for the floating mini-player. */
+val LocalMiniPlayerBottomPadding = staticCompositionLocalOf { 0.dp }
 
 /** Spring-based motion (M3 Expressive). Replaces one-off tween durations. */
 object KwhaleMotion {

@@ -60,6 +60,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.download.DownloadStore
 import org.dueattendant149.kwhale.ui.components.CoverArt
 import java.io.File
@@ -78,6 +79,7 @@ fun ProfileScreen(
     var name by remember { mutableStateOf(app.api.session()?.user?.displayName ?: "Профиль") }
     var email by remember { mutableStateOf(app.api.session()?.user?.email ?: "") }
     var avatar by remember { mutableStateOf<String?>(null) }
+    val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
     var trackCount by remember { mutableStateOf(0) }
     var playlistCount by remember { mutableStateOf(0) }
     var downloadCount by remember { mutableStateOf(0) }
@@ -129,7 +131,12 @@ fun ProfileScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 24.dp,
+            bottom = 28.dp + miniPlayerBottom,
+        ),
     ) {
         item {
             Column(

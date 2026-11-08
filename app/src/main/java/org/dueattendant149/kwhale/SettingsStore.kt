@@ -7,35 +7,6 @@ class SettingsStore(context: Context) {
 
     private val prefs = context.getSharedPreferences("kwhale_settings", Context.MODE_PRIVATE)
 
-    init {
-        migrateLegacy(context)
-    }
-
-    /**
-     * The pre-rename build used vkx_settings / vkx_session / vkx_downloads.
-     * Updating that package must not silently log the user out or reset the
-     * theme, so copy the old values once. api_base_url is deliberately not
-     * copied: the debug build now points at the LAN host.
-     */
-    private fun migrateLegacy(context: Context) {
-        if (prefs.all.isNotEmpty()) return
-        val old = context.getSharedPreferences("vkx_settings", Context.MODE_PRIVATE)
-        if (old.all.isEmpty()) return
-        prefs.edit().apply {
-            old.all.forEach { (key, value) ->
-                if (key == "api_base_url") return@forEach
-                when (value) {
-                    is String -> putString(key, value)
-                    is Int -> putInt(key, value)
-                    is Boolean -> putBoolean(key, value)
-                    is Long -> putLong(key, value)
-                    is Float -> putFloat(key, value)
-                    is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
-                }
-            }
-        }.apply()
-    }
-
     var apiBaseUrl: String
         get() = normalizeBaseUrl(prefs.getString("api_base_url", BuildConfig.API_BASE_URL) ?: BuildConfig.API_BASE_URL)
         set(value) {

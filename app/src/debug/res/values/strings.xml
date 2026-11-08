@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Debug builds only: distinguish the Compose client from the reference
-     client that also uses the KWhale label. Release keeps the plain name. -->
-<resources>
-    <string name="app_name">KWhale 0.1.1</string>
-</resources>

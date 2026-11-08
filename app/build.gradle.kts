@@ -10,14 +10,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Default stays the KWhale package. For local installs over an older
-        // build (or to coexist with the reference client), override with
-        // -PappId=org.dueattendant149.vkx at build time.
-        applicationId = providers.gradleProperty("appId").getOrElse("org.dueattendant149.kwhale")
+        applicationId = "org.dueattendant149.kwhale"
         minSdk = 31
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 12
+        versionName = "0.1.2"
         buildConfigField("String", "API_BASE_URL", "\"https://music.dueattendant149.org/v1\"")
     }
 

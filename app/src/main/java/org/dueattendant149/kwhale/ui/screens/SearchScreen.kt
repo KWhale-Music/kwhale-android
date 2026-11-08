@@ -52,6 +52,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.KwhalePlural
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.network.model.SearchResponse
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
@@ -81,6 +82,7 @@ fun SearchScreen(
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
+    val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     LaunchedEffect(Unit) {
         history = runCatching { app.api.searchHistory().items }.getOrDefault(emptyList())
@@ -149,7 +151,7 @@ fun SearchScreen(
         if (query.isBlank()) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp + miniPlayerBottom),
             ) {
                 if (history.isNotEmpty()) {
                     item { SectionHeader("Недавние запросы") }
@@ -234,7 +236,7 @@ fun SearchScreen(
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp),
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp + miniPlayerBottom),
                     ) {
                         item { TopResult(data, app, onOpenCollection) }
                         val tracks = data.tracks

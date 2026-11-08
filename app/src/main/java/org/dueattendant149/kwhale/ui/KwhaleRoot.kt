@@ -15,15 +15,18 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -63,6 +66,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -89,6 +93,7 @@ import org.dueattendant149.kwhale.design.KwhaleAccents
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
 import org.dueattendant149.kwhale.design.KwhaleMotion
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.download.Downloads
 import org.dueattendant149.kwhale.model.Track as UiTrack
 import org.dueattendant149.kwhale.network.model.Album
@@ -143,23 +148,13 @@ fun KwhaleRoot(
         if (playerState.current == null) showPlayer = false
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            if (showMini || showNav) {
-                Column(
-                    modifier = if (showNav) Modifier else Modifier.navigationBarsPadding(),
-                ) {
-                    if (showMini) {
-                        MiniPlayer(
-                            track = playerState.current,
-                            isPlaying = playerState.isPlaying,
-                            progress = playerState.progress,
-                            onOpen = { showPlayer = true },
-                            onToggle = app.player::toggle,
-                            onNext = app.player::next,
-                        )
-                    }
+    Box(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(
+            LocalMiniPlayerBottomPadding provides if (showMini) KwhaleSpacing.miniPlayer else 0.dp,
+        ) {
+            Scaffold(
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
                     if (showNav) {
                         NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                             NavigationBarItem(
@@ -188,10 +183,8 @@ fun KwhaleRoot(
                             )
                         }
                     }
-                }
-            }
-        },
-    ) { innerPadding ->
+                },
+            ) { innerPadding ->
         // Cross-fade + subtle scale on route changes. Tab switches stay instant
         // (no slide) so the bottom bar does not feel like it flickers.
         val navTransition = fadeIn(
@@ -300,6 +293,31 @@ fun KwhaleRoot(
                     onBack = { navController.popBackStack() },
                     onOpenCollection = { kind, id -> navController.navigate("collection/$kind/$id") },
                     onTrackMenu = { menuTrack = it },
+                )
+            }
+        }
+        }
+        }
+        if (showMini) {
+            val navBarInset = WindowInsets.navigationBars
+                .asPaddingValues()
+                .calculateBottomPadding()
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        bottom = navBarInset +
+                            (if (showNav) KwhaleSpacing.navBar else 0.dp) +
+                            KwhaleSpacing.xs,
+                    ),
+            ) {
+                MiniPlayer(
+                    track = playerState.current,
+                    isPlaying = playerState.isPlaying,
+                    progress = playerState.progress,
+                    onOpen = { showPlayer = true },
+                    onToggle = app.player::toggle,
+                    onNext = app.player::next,
                 )
             }
         }
@@ -423,12 +441,16 @@ private fun MiniPlayer(
                 .padding(horizontal = KwhaleSpacing.xs, vertical = KwhaleSpacing.xxs)
                 .clickable(onClick = onOpen),
             shape = RoundedCornerShape(28.dp),
-            // The capsule must not blend into the page: surfaceContainerHigh
-            // is #2A2A2A on a #121212 page (and #151515 on AMOLED black).
-            // inverseSurface is the M3 token for a high-contrast floating pill.
-            color = MaterialTheme.colorScheme.inverseSurface,
-            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-            shadowElevation = 6.dp,
+            // Floating over content, not in a bottom bar. Keep the capsule in
+            // the theme's surface family: a border + shadow separates it from
+            // the page without the stark inverseSurface (white) contrast.
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+            ),
+            shadowElevation = 8.dp,
         ) {
             Column {
                 LinearProgressIndicator(
@@ -436,7 +458,7 @@ private fun MiniPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(2.dp),
-                    color = MaterialTheme.colorScheme.inversePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Transparent,
                 )
                 Row(
@@ -483,14 +505,14 @@ private fun MiniPlayerContent(
             Text(
                 text = track.title,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.inverseOnSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = track.artist,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.72f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

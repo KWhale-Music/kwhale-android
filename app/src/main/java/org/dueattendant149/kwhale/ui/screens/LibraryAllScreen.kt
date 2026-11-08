@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.KwhalePlural
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
@@ -58,6 +59,7 @@ fun LibraryAllScreen(
     var loading by remember { mutableStateOf(true) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
+    val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
     val title = when (kind) {
         "playlists" -> "Плейлисты"
         "albums" -> "Альбомы"
@@ -137,7 +139,7 @@ fun LibraryAllScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
                     ) {
                         items(collections, key = { it.key }) { collection ->
                             Box(Modifier.padding(6.dp)) {
@@ -160,7 +162,7 @@ fun LibraryAllScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
                     ) {
                         items(playlists, key = { it.id }) { playlist ->
                             Box(Modifier.padding(6.dp)) {
@@ -182,7 +184,7 @@ fun LibraryAllScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
                     ) {
                         items(albums, key = { it.id }) { album ->
                             Box(Modifier.padding(6.dp)) {
@@ -204,7 +206,7 @@ fun LibraryAllScreen(
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
                     ) {
                         itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
                             TrackRow(

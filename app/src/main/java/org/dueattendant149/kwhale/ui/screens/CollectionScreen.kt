@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.KwhalePlural
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.PlaylistUpdate
@@ -93,6 +94,7 @@ fun CollectionScreen(
     var showDelete by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
+    val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
     var likedAll by remember { mutableStateOf(false) }
@@ -157,7 +159,12 @@ fun CollectionScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().statusBarsPadding(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 28.dp),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                end = 20.dp,
+                top = 8.dp,
+                bottom = 28.dp + miniPlayerBottom,
+            ),
         ) {
             item {
                 Row(

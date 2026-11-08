@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.EmptyState
@@ -51,6 +52,7 @@ fun HistoryScreen(
     var loadingMore by remember { mutableStateOf(false) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
+    val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     LaunchedEffect(Unit) {
         val page = runCatching { app.api.history(limit = 50) }.getOrNull()
@@ -84,7 +86,7 @@ fun HistoryScreen(
         }
         LazyColumn(
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
         ) {
             item { SectionHeader("Недавнее") }
             itemsIndexed(tracks) { index, track ->

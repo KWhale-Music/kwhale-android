@@ -29,18 +29,6 @@ class DownloadStore(context: Context) {
     private val json = Json { ignoreUnknownKeys = true }
     private val lock = Any()
 
-    init {
-        // Keep downloaded tracks recognised after updating the pre-rename build.
-        if (prefs.all.isEmpty()) {
-            val old = context.applicationContext.getSharedPreferences("vkx_downloads", Context.MODE_PRIVATE)
-            if (old.all.isNotEmpty()) {
-                prefs.edit().apply {
-                    old.all.forEach { (key, value) -> if (value is String) putString(key, value) }
-                }.apply()
-            }
-        }
-    }
-
     fun all(): List<DownloadedTrack> = synchronized(lock) {
         prefs.all.values.mapNotNull { raw ->
             (raw as? String)?.let {
