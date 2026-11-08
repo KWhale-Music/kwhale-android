@@ -156,6 +156,12 @@ class KwhaleApi(
     suspend fun artistTopTracks(id: String, limit: Int? = null): TracksPage =
         client.get("/artists/$id/top-tracks", TracksPage.serializer(), limit(limit))
 
+    suspend fun artistTracks(
+        id: String,
+        cursor: String? = null,
+        limit: Int? = null,
+    ): TracksPage = client.get("/artists/$id/tracks", TracksPage.serializer(), query(cursor, limit))
+
     suspend fun playlist(id: String): Playlist = client.get("/playlists/$id", Playlist.serializer())
 
     suspend fun playlists(

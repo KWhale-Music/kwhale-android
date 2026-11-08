@@ -106,6 +106,7 @@ import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.CoverArt
 import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.screens.AppearanceScreen
+import org.dueattendant149.kwhale.ui.screens.ArtistAllScreen
 import org.dueattendant149.kwhale.ui.screens.CollectionScreen
 import org.dueattendant149.kwhale.ui.screens.DownloadsScreen
 import org.dueattendant149.kwhale.ui.screens.HistoryScreen
@@ -320,10 +321,35 @@ fun KwhaleRoot(
                 )
             }
             composable("collection/{kind}/{id}") { entry ->
+                val collectionKind = entry.arguments?.getString("kind").orEmpty()
+                val collectionId = entry.arguments?.getString("id").orEmpty()
                 CollectionScreen(
                     app = app,
-                    kind = entry.arguments?.getString("kind").orEmpty(),
-                    collectionId = entry.arguments?.getString("id").orEmpty(),
+                    kind = collectionKind,
+                    collectionId = collectionId,
+                    onBack = { navController.popBackStack() },
+                    onOpenCollection = { kind, id -> navController.navigate("collection/$kind/$id") },
+                    onTrackMenu = { menuTrack = it },
+                    onOpenArtistAll = { tab ->
+                        navController.navigate("artist/$collectionId/$tab")
+                    },
+                )
+            }
+            composable("artist/{id}/tracks") { entry ->
+                ArtistAllScreen(
+                    app = app,
+                    artistId = entry.arguments?.getString("id").orEmpty(),
+                    initialTab = 0,
+                    onBack = { navController.popBackStack() },
+                    onOpenCollection = { kind, id -> navController.navigate("collection/$kind/$id") },
+                    onTrackMenu = { menuTrack = it },
+                )
+            }
+            composable("artist/{id}/albums") { entry ->
+                ArtistAllScreen(
+                    app = app,
+                    artistId = entry.arguments?.getString("id").orEmpty(),
+                    initialTab = 1,
                     onBack = { navController.popBackStack() },
                     onOpenCollection = { kind, id -> navController.navigate("collection/$kind/$id") },
                     onTrackMenu = { menuTrack = it },

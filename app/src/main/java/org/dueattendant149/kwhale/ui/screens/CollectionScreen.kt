@@ -94,6 +94,7 @@ fun CollectionScreen(
     onBack: () -> Unit,
     onOpenCollection: (String, String) -> Unit,
     onTrackMenu: (ApiTrack) -> Unit,
+    onOpenArtistAll: (String) -> Unit = {},
 ) {
     val cacheKey = ContentCache.collection(kind, collectionId)
     val cached = remember(kind, collectionId) {
@@ -411,7 +412,17 @@ fun CollectionScreen(
                     }
                 }
             }
-            item { SectionHeader(if (kind == "artist") "Популярные треки" else "Треки") }
+            item {
+                SectionHeader(
+                    title = if (kind == "artist") "Популярные треки" else "Треки",
+                    action = if (kind == "artist") "Все" else null,
+                    onAction = if (kind == "artist") {
+                        { onOpenArtistAll("tracks") }
+                    } else {
+                        null
+                    },
+                )
+            }
             itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                 TrackRow(
                     track = track,
@@ -434,7 +445,17 @@ fun CollectionScreen(
                 )
             }
             if (albums.isNotEmpty()) {
-                item { SectionHeader("Альбомы") }
+                item {
+                    SectionHeader(
+                        title = "Альбомы",
+                        action = if (kind == "artist") "Все" else null,
+                        onAction = if (kind == "artist") {
+                            { onOpenArtistAll("albums") }
+                        } else {
+                            null
+                        },
+                    )
+                }
                 item {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(albums, key = { it.id }) { album ->

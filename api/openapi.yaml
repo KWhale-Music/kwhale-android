@@ -434,6 +434,23 @@ paths:
       responses:
         '204': { description: Артист убран }
 
+  /artists/{artistId}/tracks:
+    get:
+      tags: [Artists]
+      operationId: getArtistTracks
+      summary: Все известные треки артиста (пагинация; не только top-20)
+      parameters:
+        - { $ref: '#/components/parameters/ArtistId' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Треки артиста
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TracksPage' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /artists/{artistId}/albums:
     get:
       tags: [Artists]
