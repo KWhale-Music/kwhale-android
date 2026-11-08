@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.data.CollectionSnapshot
@@ -481,6 +482,7 @@ fun CollectionScreen(
             onDismiss = { showAddTracks = false },
             onAdded = { added ->
                 tracks = (tracks + added).distinctBy { it.id }
+                meta = KwhalePlural.tracks(tracks.size)
                 app.cache.invalidateCollection(kind, collectionId)
                 app.cache.invalidateLibrary()
                 showAddTracks = false
@@ -656,12 +658,20 @@ private fun AddTracksSheet(
         loading = false
     }
 
-    val filtered = all.filter { track ->
-        track.id !in existingIds && (
-            query.isBlank() ||
-                track.title.contains(query.trim(), ignoreCase = true) ||
-                track.artistLine().contains(query.trim(), ignoreCase = true)
-            )
+    var filtered by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    LaunchedEffect(query, all, existingIds) {
+        if (query.isBlank()) {
+            searching = false
+            filtered = all.filter { track -> track.id !in existingIds }
+        } else {
+            searching = true
+            delay(250)
+            filtered = runCatching {
+                app.api.libraryTracks(limit = 100, query = query.trim()).items
+            }.getOrDefault(emptyList()).filter { track -> track.id !in existingIds }
+            searching = false
+        }
     }
 
     ModalBottomSheet(
@@ -683,7 +693,7 @@ private fun AddTracksSheet(
                 label = { Text("Поиск в библиотеке") },
             )
             when {
-                loading -> Box(
+                loading || searching -> Box(
                     modifier = Modifier.fillMaxWidth().height(120.dp),
                     contentAlignment = Alignment.Center,
                 ) { CircularProgressIndicator() }

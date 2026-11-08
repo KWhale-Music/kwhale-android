@@ -677,6 +677,10 @@ paths:
         - name: sort
           in: query
           schema: { type: string, enum: [default, title, artist, added], default: default }
+        - name: q
+          in: query
+          description: Поиск по библиотеке (title/artist/album)
+          schema: { type: string, maxLength: 200 }
       responses:
         '200':
           description: Лайкнутые треки

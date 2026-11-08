@@ -178,10 +178,16 @@ class KwhaleApi(
         cursor: String? = null,
         limit: Int? = null,
         sort: String = "default",
+        query: String? = null,
     ): TracksPage = client.get(
         "/library/tracks",
         TracksPage.serializer(),
-        mapOf("cursor" to cursor, "limit" to limit?.toString(), "sort" to sort),
+        mapOf(
+            "cursor" to cursor,
+            "limit" to limit?.toString(),
+            "sort" to sort,
+            "q" to query?.takeIf { it.isNotBlank() },
+        ),
     )
 
     suspend fun libraryPlaylists(cursor: String? = null, limit: Int? = null): PlaylistsPage =
