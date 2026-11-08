@@ -244,7 +244,10 @@ fun KwhaleRoot(
                 HomeScreen(
                     app = app,
                     onOpenSearch = { navController.navigateTop("search") },
-                    onSeeAll = { kind -> navController.navigate("all/$kind") },
+                    onSeeAll = { kind ->
+                        if (kind == "recent") navController.navigate("history")
+                        else navController.navigate("all/$kind")
+                    },
                     onTrackMenu = { menuTrack = it },
                     onOpenProfile = { navController.navigateTop("profile") },
                 )

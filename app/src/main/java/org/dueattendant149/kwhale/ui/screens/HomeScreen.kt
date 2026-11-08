@@ -357,7 +357,7 @@ fun HomeScreen(
         sections.filterNot { it.id in homeDuplicates }.forEach { section ->
             when (section.id) {
                 "recent" -> {
-                    item { SectionHeader("Недавно играли", action = "Все", onAction = { onSeeAll("tracks") }) }
+                    item { SectionHeader("Недавно играли", action = "Все", onAction = { onSeeAll("recent") }) }
                     item {
                         TrackCarousel(
                             section = section,
