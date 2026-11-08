@@ -49,6 +49,7 @@ data class CollectionSnapshot(
     val cover: String? = null,
     val tracks: List<Track> = emptyList(),
     val albums: List<Album> = emptyList(),
+    val latestRelease: Album? = null,
     val canEdit: Boolean = false,
     val isFavorite: Boolean = false,
     val isFollowed: Boolean = false,

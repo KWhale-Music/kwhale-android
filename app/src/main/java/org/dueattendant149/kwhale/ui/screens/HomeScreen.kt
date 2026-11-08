@@ -465,7 +465,6 @@ private fun LazyListScope.TrackItems(
         TrackRow(
             track = track,
             api = app.api,
-            modifier = Modifier.animateItem(),
             liked = track.isLiked,
             onClick = { onPlay(tracks, index) },
             onToggleLike = { onToggleLike(track) },

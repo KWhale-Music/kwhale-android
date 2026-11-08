@@ -434,6 +434,32 @@ paths:
       responses:
         '204': { description: Артист убран }
 
+  /artists/{artistId}/sync:
+    get:
+      tags: [Artists]
+      operationId: getArtistSync
+      summary: Статус полного синка дискографии
+      parameters:
+        - { $ref: '#/components/parameters/ArtistId' }
+      responses:
+        '200':
+          description: Статус синка
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArtistSyncStatus' }
+    post:
+      tags: [Artists]
+      operationId: syncArtist
+      summary: Запустить полный синк дискографии
+      parameters:
+        - { $ref: '#/components/parameters/ArtistId' }
+      responses:
+        '202':
+          description: Синк запущен
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArtistSyncStatus' }
+
   /artists/{artistId}/tracks:
     get:
       tags: [Artists]
@@ -617,6 +643,37 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Playlist' }
         '400': { $ref: '#/components/responses/BadRequest' }
+
+  /playlists/{playlistId}/cover:
+    post:
+      tags: [Playlists]
+      operationId: uploadPlaylistCover
+      summary: Загрузить свою обложку плейлиста
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Плейлист с новой обложкой
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Playlist' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Playlists]
+      operationId: deletePlaylistCover
+      summary: Сбросить обложку на генерируемую
+      parameters:
+        - { $ref: '#/components/parameters/PlaylistId' }
+      responses:
+        '204': { description: Обложка сброшена }
 
   /playlists/{playlistId}/follow:
     put:
@@ -1201,6 +1258,16 @@ components:
         playCount: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
 
+    ArtistSyncStatus:
+      type: object
+      properties:
+        artistId: { type: string }
+        status: { type: string, enum: [idle, running, done, failed, unavailable] }
+        trackCount: { type: integer }
+        albumCount: { type: integer }
+        error: { type: string }
+        expiresAt: { type: string, format: date-time }
+
     Album:
       type: object
       required: [id, title, artists, cover, trackCount, explicit]
@@ -1212,6 +1279,7 @@ components:
           items: { $ref: '#/components/schemas/ArtistRef' }
         cover: { $ref: '#/components/schemas/ImageRef' }
         year: { type: integer }
+        releaseDate: { type: string, format: date }
         trackCount: { type: integer }
         type: { type: string, enum: [album, single, ep, compilation, live] }
         explicit: { type: boolean }
@@ -1234,7 +1302,8 @@ components:
           items: { $ref: '#/components/schemas/Genre' }
         followers: { type: integer, format: int64 }
         albumCount: { type: integer }
-        isFavorite: { type: boolean, description: Карточка сохранена в библиотеке }
+        isFavorite: { type: boolean }
+        latestRelease: { $ref: '#/components/schemas/Album' }
         topTracks:
           type: array
           items: { $ref: '#/components/schemas/Track' }

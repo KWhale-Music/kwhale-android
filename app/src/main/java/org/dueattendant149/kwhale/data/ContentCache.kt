@@ -23,18 +23,24 @@ class ContentCache(context: Context) {
 
     private val dir = File(context.filesDir, "ui-cache").apply { mkdirs() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val memory = mutableMapOf<String, Any?>()
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
 
-    fun <T> read(key: String, serializer: KSerializer<T>): T? = runCatching {
-        val file = file(key)
-        if (!file.isFile) return null
-        json.decodeFromString(serializer, file.readText())
-    }.getOrNull()
+    @Suppress("UNCHECKED_CAST")
+    fun <T> read(key: String, serializer: KSerializer<T>): T? {
+        if (memory.containsKey(key)) return memory[key] as T?
+        return runCatching {
+            val file = file(key)
+            if (!file.isFile) return null
+            json.decodeFromString(serializer, file.readText()).also { memory[key] = it }
+        }.getOrNull()
+    }
 
     fun <T> write(key: String, serializer: KSerializer<T>, value: T) {
+        memory[key] = value
         scope.launch {
             runCatching {
                 val target = file(key)
@@ -54,6 +60,7 @@ class ContentCache(context: Context) {
     }
 
     fun invalidate(key: String) {
+        memory.remove(key)
         file(key).delete()
     }
 

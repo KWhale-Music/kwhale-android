@@ -1,6 +1,9 @@
 package org.dueattendant149.kwhale.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +37,8 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -66,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.data.CollectionSnapshot
 import org.dueattendant149.kwhale.data.ContentCache
@@ -107,6 +113,8 @@ fun CollectionScreen(
     var cover by remember { mutableStateOf(cached?.cover) }
     var tracks by remember { mutableStateOf(cached?.tracks.orEmpty()) }
     var albums by remember { mutableStateOf(cached?.albums.orEmpty()) }
+    var latestRelease by remember { mutableStateOf(cached?.latestRelease) }
+    var syncStatus by remember { mutableStateOf<org.dueattendant149.kwhale.network.model.ArtistSyncStatus?>(null) }
     var canEdit by remember { mutableStateOf(cached?.canEdit ?: false) }
     var showMenu by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
@@ -122,8 +130,41 @@ fun CollectionScreen(
     var isOwned by remember { mutableStateOf(cached?.isOwned ?: false) }
     var actionBusy by remember { mutableStateOf(false) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
+    val displayTracks = if (kind == "artist") tracks.take(5) else tracks
+    val displayAlbums = if (kind == "artist") albums.take(5) else albums
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val coverPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                runCatching {
+                    val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                    val ext = when {
+                        mime.contains("png") -> "png"
+                        mime.contains("webp") -> "webp"
+                        else -> "jpg"
+                    }
+                    val file = File.createTempFile("playlist_cover", ".$ext", context.cacheDir)
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
+                    } ?: error("Не удалось прочитать изображение")
+                    val updated = app.api.uploadPlaylistCover(collectionId, file, mime)
+                    file.delete()
+                    updated
+                }.onSuccess { updated ->
+                    cover = updated.imageUrl(app.api)
+                    app.cache.invalidateCollection(kind, collectionId)
+                    app.cache.invalidateLibrary()
+                    Toast.makeText(context, "Обложка обновлена", Toast.LENGTH_SHORT).show()
+                    reload++
+                }.onFailure {
+                    Toast.makeText(context, "Не удалось загрузить обложку", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     LaunchedEffect(kind, collectionId, reload) {
         if (reload == 0 && cached != null && app.cache.isFresh(cacheKey, 30_000)) {
@@ -151,6 +192,7 @@ fun CollectionScreen(
                     meta = "${artist.followers} слушателей"
                     cover = artist.imageUrl(app.api)
                     isFavorite = artist.isFavorite
+                    latestRelease = artist.latestRelease
                     tracks = artist.topTracks.ifEmpty { app.api.artistTopTracks(collectionId).items }
                     albums = artist.albums.ifEmpty { app.api.artistAlbums(collectionId).items }
                 }
@@ -177,6 +219,7 @@ fun CollectionScreen(
                     cover = cover,
                     tracks = tracks,
                     albums = albums,
+                    latestRelease = latestRelease,
                     canEdit = canEdit,
                     isFavorite = isFavorite,
                     isFollowed = isFollowed,
@@ -187,6 +230,24 @@ fun CollectionScreen(
             if (cached == null) error = it.message ?: "Ошибка сети"
         }
         loading = false
+    }
+
+    LaunchedEffect(kind, collectionId) {
+        if (kind != "artist") return@LaunchedEffect
+        syncStatus = runCatching { app.api.syncArtist(collectionId) }.getOrNull()
+        repeat(8) {
+            delay(2000)
+            val state = runCatching { app.api.artistSyncStatus(collectionId) }.getOrNull()
+                ?: return@LaunchedEffect
+            syncStatus = state
+            if (state.status in setOf("done", "failed", "unavailable")) {
+                if (state.status == "done") {
+                    app.cache.invalidateCollection(kind, collectionId)
+                    reload++
+                }
+                return@LaunchedEffect
+            }
+        }
     }
 
     fun toggleSaved() {
@@ -283,6 +344,39 @@ fun CollectionScreen(
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             if (kind == "playlist" && canEdit) {
                                 DropdownMenuItem(
+                                    text = { Text("Изменить обложку") },
+                                    onClick = {
+                                        showMenu = false
+                                        coverPicker.launch(
+                                            PickVisualMediaRequest(
+                                                ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                            ),
+                                        )
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Удалить обложку") },
+                                    onClick = {
+                                        showMenu = false
+                                        scope.launch {
+                                            runCatching { app.api.deletePlaylistCover(collectionId) }
+                                                .onSuccess {
+                                                    cover = null
+                                                    app.cache.invalidateCollection(kind, collectionId)
+                                                    app.cache.invalidateLibrary()
+                                                    reload++
+                                                }
+                                                .onFailure {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Не удалось удалить обложку",
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                }
+                                        }
+                                    },
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Переименовать") },
                                     onClick = {
                                         showMenu = false
@@ -317,6 +411,8 @@ fun CollectionScreen(
                         modifier = Modifier.size(if (kind == "artist") 220.dp else 180.dp),
                         shape = RoundedCornerShape(12.dp),
                         iconSize = 44,
+                        seed = title,
+                        titleText = if (kind == "playlist") title else null,
                     )
                     Spacer(Modifier.height(14.dp))
                     Text(
@@ -344,6 +440,26 @@ fun CollectionScreen(
                             textAlign = TextAlign.Center,
                         )
                     }
+                }
+            }
+            if (kind == "artist" && syncStatus?.status == "running") {
+                item {
+                    Text(
+                        text = "Обновляем дискографию…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(vertical = 6.dp),
+                    )
+                }
+            }
+            latestRelease?.let { release ->
+                item { SectionHeader("Последний релиз") }
+                item {
+                    LatestReleaseCard(
+                        album = release,
+                        app = app,
+                        onClick = { onOpenCollection("album", release.id) },
+                    )
                 }
             }
             item {
@@ -424,11 +540,10 @@ fun CollectionScreen(
                     },
                 )
             }
-            itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+            itemsIndexed(displayTracks, key = { _, track -> track.id }) { index, track ->
                 TrackRow(
                     track = track,
                     api = app.api,
-                    modifier = Modifier.animateItem(),
                     liked = liked[track.id] ?: track.isLiked,
                     onClick = { app.player.playQueue(tracks.map { it.toUi(app.api) }, index) },
                     onToggleLike = {
@@ -460,7 +575,7 @@ fun CollectionScreen(
                 if (albums.isNotEmpty()) {
                     item {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(albums, key = { it.id }) { album ->
+                            items(displayAlbums, key = { it.id }) { album ->
                                 AlbumCard(
                                     album = album,
                                     api = app.api,
@@ -641,20 +756,32 @@ private fun AddTracksSheet(
         app.cache.read(ContentCache.LIBRARY, LibrarySnapshot.serializer())?.tracks.orEmpty()
     }
     var all by remember { mutableStateOf(cached) }
+    var ready by remember { mutableStateOf(all.isNotEmpty()) }
     var loading by remember { mutableStateOf(all.isEmpty()) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var reloadKey by remember { mutableStateOf(0) }
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var saving by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reloadKey) {
         if (all.isNotEmpty() && app.cache.isFresh(ContentCache.LIBRARY, 30_000)) {
+            ready = true
             loading = false
             return@LaunchedEffect
         }
-        val fresh = runCatching { app.api.libraryTracks(limit = 200).items }
-            .getOrDefault(emptyList())
-        if (fresh.isNotEmpty()) all = fresh
+        loading = all.isEmpty()
+        runCatching { app.api.libraryTracks(limit = 200).items }
+            .onSuccess { fresh ->
+                if (fresh.isNotEmpty()) all = fresh
+                loadError = null
+                ready = true
+            }
+            .onFailure {
+                loadError = it.message ?: "Ошибка сети"
+                if (all.isEmpty()) ready = true
+            }
         loading = false
     }
 
@@ -693,10 +820,22 @@ private fun AddTracksSheet(
                 label = { Text("Поиск в библиотеке") },
             )
             when {
-                loading || searching -> Box(
+                !ready || loading || searching -> Box(
                     modifier = Modifier.fillMaxWidth().height(120.dp),
                     contentAlignment = Alignment.Center,
                 ) { CircularProgressIndicator() }
+                loadError != null && all.isEmpty() -> Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        "Не удалось загрузить библиотеку",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { reloadKey++ }) { Text("Повторить") }
+                }
                 filtered.isEmpty() -> Text(
                     if (all.isEmpty()) "В библиотеке пока нет треков" else "Ничего не найдено",
                     style = MaterialTheme.typography.bodyMedium,
@@ -776,6 +915,48 @@ private fun AddTracksSheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(if (selected.isEmpty()) "Выберите треки" else "Добавить (${selected.size})")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LatestReleaseCard(
+    album: Album,
+    app: KwhaleApp,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CoverArt(
+                imageUrl = album.imageUrl(app.api),
+                modifier = Modifier.size(72.dp),
+                shape = RoundedCornerShape(12.dp),
+                iconSize = 24,
+                seed = album.title,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = album.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = album.releaseDate?.take(10) ?: album.year?.toString().orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

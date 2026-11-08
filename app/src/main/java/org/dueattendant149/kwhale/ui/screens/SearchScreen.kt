@@ -277,8 +277,7 @@ fun SearchScreen(
                                 TrackRow(
                                     track = track,
                                     api = app.api,
-                                    modifier = Modifier.animateItem(),
-                                    liked = liked[track.id] ?: track.isLiked,
+                                                    liked = liked[track.id] ?: track.isLiked,
                                     onClick = {
                                         app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
                                     },

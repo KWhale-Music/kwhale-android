@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
@@ -102,11 +103,26 @@ private fun ArtistTracks(
     var loading by remember { mutableStateOf(true) }
     var loadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     LaunchedEffect(artistId) {
+        runCatching { app.api.syncArtist(artistId) }
+        repeat(8) {
+            delay(1500)
+            val state = runCatching { app.api.artistSyncStatus(artistId) }.getOrNull()
+                ?: return@LaunchedEffect
+            if (state.status == "done") {
+                refreshKey++
+                return@LaunchedEffect
+            }
+            if (state.status == "failed" || state.status == "unavailable") return@LaunchedEffect
+        }
+    }
+
+    LaunchedEffect(artistId, refreshKey) {
         loading = true
         runCatching { app.api.artistTracks(artistId, limit = 50) }
             .onSuccess {
@@ -179,7 +195,6 @@ private fun ArtistTracks(
             TrackRow(
                 track = track,
                 api = app.api,
-                modifier = Modifier.animateItem(),
                 liked = liked[track.id] ?: track.isLiked,
                 onClick = { app.player.playQueue(items.map { it.toUi(app.api) }, index) },
                 onToggleLike = {
@@ -219,11 +234,26 @@ private fun ArtistAlbums(
     var loading by remember { mutableStateOf(true) }
     var loadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     LaunchedEffect(artistId) {
+        runCatching { app.api.syncArtist(artistId) }
+        repeat(8) {
+            delay(1500)
+            val state = runCatching { app.api.artistSyncStatus(artistId) }.getOrNull()
+                ?: return@LaunchedEffect
+            if (state.status == "done") {
+                refreshKey++
+                return@LaunchedEffect
+            }
+            if (state.status == "failed" || state.status == "unavailable") return@LaunchedEffect
+        }
+    }
+
+    LaunchedEffect(artistId, refreshKey) {
         loading = true
         runCatching { app.api.artistAlbums(artistId, limit = 50) }
             .onSuccess {

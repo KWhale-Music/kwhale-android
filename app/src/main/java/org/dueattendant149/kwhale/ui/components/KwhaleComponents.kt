@@ -17,6 +17,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -57,14 +58,20 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import org.dueattendant149.kwhale.design.KwhaleCoverPalette
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
@@ -162,6 +169,7 @@ fun CoverArt(
     iconSize: Int = 20,
     seed: String = "",
     showInitial: Boolean = true,
+    titleText: String? = null,
 ) {
     val dark = isDarkTheme()
     val gradient = remember(seed, dark) { KwhaleCoverPalette.gradient(seed, dark) }
@@ -176,7 +184,48 @@ fun CoverArt(
             .semantics { contentDescription = "Обложка: $description" },
         contentAlignment = Alignment.Center,
     ) {
-        if (showInitial && initial.isNotEmpty()) {
+        if (showInitial && !titleText.isNullOrBlank()) {
+            BoxWithConstraints(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                val density = LocalDensity.current
+                val measurer = rememberTextMeasurer()
+                val style = MaterialTheme.typography.titleMedium.copy(
+                    color = onGradient,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                )
+                val maxTextWidth = (maxWidth - 20.dp).coerceAtLeast(1.dp)
+                val maxTextHeight = (maxHeight - 16.dp).coerceAtLeast(1.dp)
+                val fontSize = remember(titleText, maxTextWidth, maxTextHeight) {
+                    var chosen = 9f
+                    for (size in listOf(24f, 20f, 17f, 15f, 13f, 11f, 9f)) {
+                        val measured = measurer.measure(
+                            AnnotatedString(titleText),
+                            style.copy(fontSize = size.sp),
+                            constraints = Constraints(
+                                maxWidth = with(density) { maxTextWidth.roundToPx() },
+                                maxHeight = with(density) { maxTextHeight.roundToPx() },
+                            ),
+                            maxLines = 4,
+                        )
+                        if (!measured.hasVisualOverflow) {
+                            chosen = size
+                            break
+                        }
+                    }
+                    chosen
+                }
+                Text(
+                    text = titleText,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                    color = onGradient,
+                    fontSize = fontSize.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else if (showInitial && initial.isNotEmpty()) {
             Text(
                 text = initial,
                 color = onGradient,
@@ -196,8 +245,15 @@ fun CoverArt(
         if (!imageUrl.isNullOrBlank()) {
             // The gradient plate is already painted; AsyncImage simply draws
             // over it when the bitmap arrives. No subcomposition per row.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val request = remember(imageUrl) {
+                ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .crossfade(false)
+                    .build()
+            }
             AsyncImage(
-                model = imageUrl,
+                model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
@@ -338,7 +394,6 @@ fun TrackRow(
     val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = modifier
-            .pressScale(interaction)
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .clickable(
@@ -425,23 +480,13 @@ fun LikeIconButton(
     modifier: Modifier = Modifier,
     size: Int = 22,
 ) {
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (liked) 1.12f else 1f,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
-        ),
-        label = "likeScale",
-    )
     IconButton(onClick = onClick, modifier = modifier) {
         Icon(
             imageVector = if (liked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
             contentDescription = if (liked) "Убрать из любимых" else "В любимые",
             tint = if (liked) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .size(size.dp)
-                .graphicsLayer { scaleX = scale; scaleY = scale },
+            modifier = Modifier.size(size.dp),
         )
     }
 }
@@ -588,6 +633,7 @@ fun PlaylistCard(
             shape = RoundedCornerShape(10.dp),
             iconSize = 28,
             seed = playlist.coverSeed(),
+            titleText = playlist.title,
         )
         Spacer(Modifier.height(KwhaleSpacing.xs))
         Text(

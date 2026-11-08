@@ -32,6 +32,7 @@ data class Album(
     val artists: List<ArtistRef> = emptyList(),
     val cover: ImageRef? = null,
     val year: Int? = null,
+    val releaseDate: String? = null,
     val trackCount: Int = 0,
     val type: String? = null,
     val explicit: Boolean = false,
@@ -50,6 +51,7 @@ data class Artist(
     val followers: Long = 0L,
     val albumCount: Int = 0,
     val isFavorite: Boolean = false,
+    val latestRelease: Album? = null,
     val topTracks: List<Track> = emptyList(),
     val albums: List<Album> = emptyList(),
 )
@@ -204,4 +206,14 @@ data class HomeSection(
 @Serializable
 data class HomeResponse(
     val sections: List<HomeSection> = emptyList(),
+)
+
+@Serializable
+data class ArtistSyncStatus(
+    val artistId: String = "",
+    val status: String = "idle",
+    val trackCount: Int = 0,
+    val albumCount: Int = 0,
+    val error: String? = null,
+    val expiresAt: String? = null,
 )

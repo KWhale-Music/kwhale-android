@@ -5,6 +5,7 @@ import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.AlbumsPage
 import org.dueattendant149.kwhale.network.model.EnrichmentListPage
 import org.dueattendant149.kwhale.network.model.Artist
+import org.dueattendant149.kwhale.network.model.ArtistSyncStatus
 import org.dueattendant149.kwhale.network.model.ArtistsPage
 import org.dueattendant149.kwhale.network.model.AuthResponse
 import org.dueattendant149.kwhale.network.model.Config
@@ -161,6 +162,12 @@ class KwhaleApi(
         cursor: String? = null,
         limit: Int? = null,
     ): TracksPage = client.get("/artists/$id/tracks", TracksPage.serializer(), query(cursor, limit))
+
+    suspend fun syncArtist(id: String): ArtistSyncStatus =
+        client.post("/artists/$id/sync", null, ArtistSyncStatus.serializer())
+
+    suspend fun artistSyncStatus(id: String): ArtistSyncStatus =
+        client.get("/artists/$id/sync", ArtistSyncStatus.serializer())
 
     suspend fun playlist(id: String): Playlist = client.get("/playlists/$id", Playlist.serializer())
 
@@ -369,6 +376,17 @@ class KwhaleApi(
     suspend fun config(): Config = client.get("/config", Config.serializer())
 
     suspend fun health(): HealthResponse = client.get("/health", HealthResponse.serializer())
+
+    suspend fun uploadPlaylistCover(id: String, file: java.io.File, mimeType: String = "image/jpeg"): Playlist =
+        client.postMultipart(
+            path = "/playlists/$id/cover",
+            file = file,
+            mimeType = mimeType,
+            formFields = emptyMap(),
+            serializer = Playlist.serializer(),
+        )
+
+    suspend fun deletePlaylistCover(id: String) = client.deleteUnit("/playlists/$id/cover")
 
     suspend fun uploadTrack(
         file: java.io.File,
