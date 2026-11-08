@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
@@ -97,13 +98,30 @@ fun SearchScreen(
         delay(350)
         loading = true
         error = null
-        runCatching { app.api.search(query.trim(), limit = 30) }
-            .onSuccess { results = it }
-            .onFailure {
-                results = null
-                error = "Не удалось выполнить поиск"
+        try {
+            // Two-wave search: show what the fast sources returned right away,
+            // then ask the server to wait for the slow ones. Previously the
+            // client never followed up, so a partial (often local-only) first
+            // wave stayed on screen forever.
+            val quick = app.api.search(query.trim(), limit = 30, wait = false)
+            results = quick
+            loading = false
+            if (quick.partial) {
+                try {
+                    results = app.api.search(query.trim(), limit = 30, wait = true)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Keep the quick result rather than replacing it with an error.
+                }
             }
-        loading = false
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            results = null
+            error = "Не удалось выполнить поиск: ${e.message ?: "сеть"}"
+            loading = false
+        }
     }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {

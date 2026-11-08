@@ -42,6 +42,30 @@ class EncryptedTokenStore(
         context.applicationContext.getSharedPreferences("kwhale_session_plain", Context.MODE_PRIVATE)
     }
 
+    init {
+        migrateLegacy(context)
+    }
+
+    /** Carry the session over from the pre-rename vkx_session store once. */
+    private fun migrateLegacy(context: Context) {
+        if (prefs.getString(KEY_SESSION, null) != null) return
+        val old = runCatching {
+            val masterKey = MasterKey.Builder(context.applicationContext)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                context.applicationContext,
+                "vkx_session",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        }.getOrNull() ?: return
+        val raw = old.getString(KEY_SESSION, null) ?: return
+        prefs.edit().putString(KEY_SESSION, raw).apply()
+        old.edit().remove(KEY_SESSION).apply()
+    }
+
     override fun load(): Session? {
         val raw = prefs.getString(KEY_SESSION, null) ?: return null
         return runCatching { json.decodeFromString(Session.serializer(), raw) }

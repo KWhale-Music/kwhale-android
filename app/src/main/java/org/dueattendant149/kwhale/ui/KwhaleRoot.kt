@@ -422,9 +422,13 @@ private fun MiniPlayer(
                 .fillMaxWidth()
                 .padding(horizontal = KwhaleSpacing.xs, vertical = KwhaleSpacing.xxs)
                 .clickable(onClick = onOpen),
-            shape = RoundedCornerShape(percent = 50),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = RoundedCornerShape(28.dp),
+            // The capsule must not blend into the page: surfaceContainerHigh
+            // is #2A2A2A on a #121212 page (and #151515 on AMOLED black).
+            // inverseSurface is the M3 token for a high-contrast floating pill.
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            shadowElevation = 6.dp,
         ) {
             Column {
                 LinearProgressIndicator(
@@ -432,7 +436,7 @@ private fun MiniPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(2.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.inversePrimary,
                     trackColor = Color.Transparent,
                 )
                 Row(
@@ -479,14 +483,14 @@ private fun MiniPlayerContent(
             Text(
                 text = track.title,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.inverseOnSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = track.artist,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.72f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
