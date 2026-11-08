@@ -105,6 +105,7 @@ import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.CoverArt
 import org.dueattendant149.kwhale.ui.components.artistLine
+import org.dueattendant149.kwhale.ui.components.imageUrl
 import org.dueattendant149.kwhale.ui.screens.AppearanceScreen
 import org.dueattendant149.kwhale.ui.screens.ArtistAllScreen
 import org.dueattendant149.kwhale.ui.screens.CollectionScreen
@@ -642,7 +643,7 @@ private fun AddToPlaylistSheet(
                         supportingContent = { Text(KwhalePlural.tracks(playlist.trackCount)) },
                         leadingContent = {
                             CoverArt(
-                                imageUrl = playlist.cover?.let { app.api.imageUrl(it.id) },
+                                imageUrl = playlist.imageUrl(app.api),
                                 modifier = Modifier.size(44.dp),
                                 shape = RoundedCornerShape(8.dp),
                             )

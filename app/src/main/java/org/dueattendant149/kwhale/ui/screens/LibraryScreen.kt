@@ -55,6 +55,7 @@ import org.dueattendant149.kwhale.ui.components.ErrorState
 import org.dueattendant149.kwhale.ui.components.SectionHeader
 import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import org.dueattendant149.kwhale.ui.components.TrackRow
+import org.dueattendant149.kwhale.ui.components.imageUrl
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 
 @Composable
@@ -123,7 +124,7 @@ fun LibraryScreen(
                 id = playlist.id,
                 title = playlist.title,
                 subtitle = KwhalePlural.tracks(playlist.trackCount),
-                coverUrl = playlist.cover?.let { app.api.imageUrl(it.id) },
+                coverUrl = playlist.imageUrl(app.api),
             )
         } + albums.map { album ->
             LibraryCollection(
@@ -132,7 +133,7 @@ fun LibraryScreen(
                 id = album.id,
                 title = album.title,
                 subtitle = album.artists.joinToString(", ") { it.name }.ifBlank { "Альбом" },
-                coverUrl = album.cover?.let { app.api.imageUrl(it.id) },
+                coverUrl = album.imageUrl(app.api),
             )
         }
     }
