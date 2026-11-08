@@ -145,7 +145,7 @@ paths:
     get:
       tags: [Home]
       operationId: getHome
-      summary: Агрегированная главная (библиотека + заглушки рекомендаций)
+      summary: Главная — только недавние треки; миксы приходят из /mixes
       parameters:
         - { $ref: '#/components/parameters/Cursor' }
         - { $ref: '#/components/parameters/Limit' }
@@ -367,6 +367,25 @@ paths:
               schema: { $ref: '#/components/schemas/Album' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /albums/{albumId}/like:
+    put:
+      tags: [Albums]
+      operationId: likeAlbum
+      summary: Сохранить карточку альбома в библиотеку (без лайков треков и загрузок)
+      parameters:
+        - { $ref: '#/components/parameters/AlbumId' }
+      responses:
+        '204': { description: Альбом сохранён }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Albums]
+      operationId: unlikeAlbum
+      summary: Убрать карточку альбома из библиотеки
+      parameters:
+        - { $ref: '#/components/parameters/AlbumId' }
+      responses:
+        '204': { description: Альбом убран }
+
   /albums/{albumId}/tracks:
     get:
       tags: [Albums]
@@ -395,6 +414,25 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Artist' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /artists/{artistId}/like:
+    put:
+      tags: [Artists]
+      operationId: likeArtist
+      summary: Сохранить карточку артиста в библиотеку (без загрузок)
+      parameters:
+        - { $ref: '#/components/parameters/ArtistId' }
+      responses:
+        '204': { description: Артист сохранён }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Artists]
+      operationId: unlikeArtist
+      summary: Убрать карточку артиста из библиотеки
+      parameters:
+        - { $ref: '#/components/parameters/ArtistId' }
+      responses:
+        '204': { description: Артист убран }
 
   /artists/{artistId}/albums:
     get:
@@ -638,10 +676,25 @@ paths:
         - { $ref: '#/components/parameters/Limit' }
       responses:
         '200':
-          description: Плейлисты в библиотеке
+          description: Плейлисты в библиотеке (свои и подписки)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PlaylistsPage' }
+
+  /library/albums:
+    get:
+      tags: [Library]
+      operationId: libraryAlbums
+      summary: Только явно сохранённые карточки альбомов
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Сохранённые альбомы
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlbumsPage' }
 
   /history:
     get:
@@ -1141,6 +1194,7 @@ components:
         trackCount: { type: integer }
         type: { type: string, enum: [album, single, ep, compilation, live] }
         explicit: { type: boolean }
+        isFavorite: { type: boolean, description: Карточка сохранена в библиотеке }
         tracks:
           type: array
           items: { $ref: '#/components/schemas/Track' }
@@ -1159,6 +1213,7 @@ components:
           items: { $ref: '#/components/schemas/Genre' }
         followers: { type: integer, format: int64 }
         albumCount: { type: integer }
+        isFavorite: { type: boolean, description: Карточка сохранена в библиотеке }
         topTracks:
           type: array
           items: { $ref: '#/components/schemas/Track' }
@@ -1360,7 +1415,19 @@ components:
         mixes:
           type: array
           items: { $ref: '#/components/schemas/Mix' }
+        top:
+          $ref: '#/components/schemas/SearchTop'
         total: { type: integer }
+
+    SearchTop:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [track, album, artist, playlist] }
+        track: { $ref: '#/components/schemas/Track' }
+        album: { $ref: '#/components/schemas/Album' }
+        artist: { $ref: '#/components/schemas/Artist' }
+        playlist: { $ref: '#/components/schemas/Playlist' }
 
     Suggestion:
       type: object

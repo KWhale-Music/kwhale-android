@@ -55,6 +55,7 @@ import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.network.model.SearchResponse
+import org.dueattendant149.kwhale.network.model.SearchTop
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
 import org.dueattendant149.kwhale.ui.components.ArtistCard
@@ -238,8 +239,20 @@ fun SearchScreen(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp + miniPlayerBottom),
                     ) {
-                        item { TopResult(data, app, onOpenCollection) }
-                        val tracks = data.tracks
+                        item { TopResult(data.top, app, onOpenCollection) }
+                        val top = data.top
+                        val tracks = data.tracks.filterNot {
+                            top?.type == "track" && it.id == top.track?.id
+                        }
+                        val albums = data.albums.filterNot {
+                            top?.type == "album" && it.id == top.album?.id
+                        }
+                        val artists = data.artists.filterNot {
+                            top?.type == "artist" && it.id == top.artist?.id
+                        }
+                        val playlists = data.playlists.filterNot {
+                            top?.type == "playlist" && it.id == top.playlist?.id
+                        }
                         if (tracks.isNotEmpty()) {
                             item { SectionHeader("Треки") }
                             itemsIndexed(tracks) { index, track ->
@@ -263,11 +276,11 @@ fun SearchScreen(
                                 )
                             }
                         }
-                        if (data.albums.isNotEmpty()) {
+                        if (albums.isNotEmpty()) {
                             item { SectionHeader("Альбомы") }
                             item {
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(data.albums) { album ->
+                                    items(albums) { album ->
                                         AlbumCard(
                                             album = album,
                                             api = app.api,
@@ -277,11 +290,11 @@ fun SearchScreen(
                                 }
                             }
                         }
-                        if (data.playlists.isNotEmpty()) {
+                        if (playlists.isNotEmpty()) {
                             item { SectionHeader("Плейлисты") }
                             item {
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(data.playlists) { playlist ->
+                                    items(playlists) { playlist ->
                                         PlaylistCard(
                                             playlist = playlist,
                                             api = app.api,
@@ -291,11 +304,11 @@ fun SearchScreen(
                                 }
                             }
                         }
-                        if (data.artists.isNotEmpty()) {
+                        if (artists.isNotEmpty()) {
                             item { SectionHeader("Артисты") }
                             item {
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(data.artists) { artist ->
+                                    items(artists) { artist ->
                                         ArtistCard(
                                             artist = artist,
                                             api = app.api,
@@ -314,42 +327,46 @@ fun SearchScreen(
 
 @Composable
 private fun TopResult(
-    data: SearchResponse,
+    top: SearchTop?,
     app: KwhaleApp,
     onOpenCollection: (String, String) -> Unit,
 ) {
-    val artist = data.artists.firstOrNull()
-    val album = data.albums.firstOrNull()
-    val track = data.tracks.firstOrNull()
-    val playlist = data.playlists.firstOrNull()
-
-    val (title, subtitle, cover, onClick) = when {
-        artist != null -> Quad(
-            artist.name,
-            "Артист",
-            artist.imageUrl(app.api),
-            { onOpenCollection("artist", artist.id) },
-        )
-        album != null -> Quad(
-            album.title,
-            album.artists.joinToString(", ") { it.name },
-            album.imageUrl(app.api),
-            { onOpenCollection("album", album.id) },
-        )
-        track != null -> Quad(
-            track.title,
-            track.artistLine(),
-            track.imageUrl(app.api),
-            { app.player.playQueue(listOf(track.toUi(app.api)), 0) },
-        )
-        playlist != null -> Quad(
-            playlist.title,
-            KwhalePlural.tracks(playlist.trackCount),
-            playlist.imageUrl(app.api),
-            { onOpenCollection("playlist", playlist.id) },
-        )
-        else -> return
-    }
+    val result = when (top?.type) {
+        "artist" -> top.artist?.let {
+            Quad(
+                it.name,
+                "Артист",
+                it.imageUrl(app.api),
+                { onOpenCollection("artist", it.id) },
+            )
+        }
+        "album" -> top.album?.let {
+            Quad(
+                it.title,
+                it.artists.joinToString(", ") { artist -> artist.name },
+                it.imageUrl(app.api),
+                { onOpenCollection("album", it.id) },
+            )
+        }
+        "track" -> top.track?.let {
+            Quad(
+                it.title,
+                it.artistLine(),
+                it.imageUrl(app.api),
+                { app.player.playQueue(listOf(it.toUi(app.api)), 0) },
+            )
+        }
+        "playlist" -> top.playlist?.let {
+            Quad(
+                it.title,
+                KwhalePlural.tracks(it.trackCount),
+                it.imageUrl(app.api),
+                { onOpenCollection("playlist", it.id) },
+            )
+        }
+        else -> null
+    } ?: return
+    val (title, subtitle, cover, onClick) = result
 
     SectionHeader("Лучший результат")
     Surface(

@@ -116,6 +116,15 @@ data class Suggestions(
 )
 
 @Serializable
+data class SearchTop(
+    val type: String = "",
+    val track: Track? = null,
+    val album: Album? = null,
+    val artist: Artist? = null,
+    val playlist: Playlist? = null,
+)
+
+@Serializable
 data class SearchResponse(
     val query: String = "",
     val tracks: List<Track> = emptyList(),
@@ -123,6 +132,7 @@ data class SearchResponse(
     val artists: List<Artist> = emptyList(),
     val playlists: List<Playlist> = emptyList(),
     val mixes: List<Mix> = emptyList(),
+    val top: SearchTop? = null,
     val total: Int = 0,
     val partial: Boolean = false,
 )
