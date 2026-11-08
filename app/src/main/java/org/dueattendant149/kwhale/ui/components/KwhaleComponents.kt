@@ -565,6 +565,7 @@ fun AlbumCard(
     modifier: Modifier = Modifier,
     width: Int = 140,
     seed: String = "",
+    coverTitle: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Column(
@@ -586,6 +587,7 @@ fun AlbumCard(
             shape = RoundedCornerShape(10.dp),
             iconSize = 28,
             seed = seed.ifBlank { title },
+            titleText = coverTitle,
         )
         Spacer(Modifier.height(KwhaleSpacing.xs))
         Text(

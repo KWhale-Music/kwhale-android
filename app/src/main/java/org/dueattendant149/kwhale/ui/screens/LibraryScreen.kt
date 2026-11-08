@@ -176,6 +176,7 @@ fun LibraryScreen(
                             title = collection.title,
                             artist = collection.subtitle,
                             coverUrl = collection.coverUrl,
+                            coverTitle = if (collection.kind == "playlist") collection.title else null,
                             onClick = { onOpenCollection(collection.kind, collection.id) },
                         )
                     }
