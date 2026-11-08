@@ -181,6 +181,9 @@ class KwhaleApi(
     suspend fun libraryPlaylists(cursor: String? = null, limit: Int? = null): PlaylistsPage =
         client.get("/library/playlists", PlaylistsPage.serializer(), query(cursor, limit))
 
+    suspend fun libraryAlbums(cursor: String? = null, limit: Int? = null): AlbumsPage =
+        client.get("/library/albums", AlbumsPage.serializer(), query(cursor, limit))
+
     suspend fun history(cursor: String? = null, limit: Int? = null): HistoryPage =
         client.get("/history", HistoryPage.serializer(), query(cursor, limit))
 
@@ -239,6 +242,15 @@ class KwhaleApi(
         return client.put("/playlists/$id/tracks/order", body, Playlist.serializer())
     }
 
+    /** Save the album card only. Never likes or downloads its tracks. */
+    suspend fun likeAlbum(id: String) = client.putUnit("/albums/$id/like")
+    suspend fun unlikeAlbum(id: String) = client.deleteUnit("/albums/$id/like")
+
+    /** Save the artist card only. */
+    suspend fun likeArtist(id: String) = client.putUnit("/artists/$id/like")
+    suspend fun unlikeArtist(id: String) = client.deleteUnit("/artists/$id/like")
+
+    /** Like every track of an album: adds them to the library and downloads. */
     suspend fun likeAlbumTracks(id: String): LikeAllResult {
         return client.put(
             "/albums/$id/tracks/like",

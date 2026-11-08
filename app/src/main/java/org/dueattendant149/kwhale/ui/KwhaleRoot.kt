@@ -209,9 +209,6 @@ fun KwhaleRoot(
             composable("home") {
                 HomeScreen(
                     app = app,
-                    playerState = playerState,
-                    onOpenPlayer = { showPlayer = true },
-                    onOpenCollection = { kind, id -> navController.navigate("collection/$kind/$id") },
                     onOpenSearch = { navController.navigateTop("search") },
                     onSeeAll = { kind -> navController.navigate("all/$kind") },
                     onTrackMenu = { menuTrack = it },

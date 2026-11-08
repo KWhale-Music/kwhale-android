@@ -42,10 +42,10 @@ import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
+import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
-import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.components.EmptyState
 import org.dueattendant149.kwhale.ui.components.ErrorState
 import org.dueattendant149.kwhale.ui.components.PlaylistCard
@@ -63,6 +63,7 @@ fun LibraryScreen(
 ) {
     var tracks by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
+    var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
@@ -76,8 +77,10 @@ fun LibraryScreen(
         runCatching {
             val tracksPage = app.api.libraryTracks(limit = 100)
             val playlistsPage = app.api.libraryPlaylists(limit = 100)
+            val albumsPage = app.api.libraryAlbums(limit = 100)
             tracks = tracksPage.items
             playlists = playlistsPage.items
+            albums = albumsPage.items
         }.onFailure { error = it.message ?: "Ошибка сети" }
         loading = false
     }
@@ -97,24 +100,8 @@ fun LibraryScreen(
         return
     }
 
-    val albums = remember(tracks) {
-        tracks.mapNotNull { track ->
-            track.album?.let { it to track }
-        }
-            .groupBy({ it.first.id }, { it.first })
-            .map { (id, refs) ->
-                val first = refs.first()
-                val artist = tracks.firstOrNull { it.album?.id == id }?.artistLine().orEmpty()
-                LibraryAlbum(
-                    id = id,
-                    title = first.title,
-                    artist = artist.ifBlank { "Альбом" },
-                    coverUrl = first.cover?.let { app.api.imageUrl(it.id) },
-                    count = tracks.count { it.album?.id == id },
-                )
-            }
-    }
-
+    // Library albums are explicitly saved cards only. They are NOT derived from
+    // liked tracks: liking one track must not add its whole album to the library.
     val collections = remember(playlists, albums, app) {
         playlists.map { playlist ->
             LibraryCollection(
@@ -131,8 +118,8 @@ fun LibraryScreen(
                 kind = "album",
                 id = album.id,
                 title = album.title,
-                subtitle = album.artist,
-                coverUrl = album.coverUrl,
+                subtitle = album.artists.joinToString(", ") { it.name }.ifBlank { "Альбом" },
+                coverUrl = album.cover?.let { app.api.imageUrl(it.id) },
             )
         }
     }
@@ -168,7 +155,7 @@ fun LibraryScreen(
         }
 
         if (collections.isNotEmpty()) {
-            item { SectionHeader("Коллекции", action = "Все", onAction = { onSeeAll("collections") }) }
+            item { SectionHeader("Альбомы", action = "Все", onAction = { onSeeAll("collections") }) }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(collections, key = { it.key }) { collection ->

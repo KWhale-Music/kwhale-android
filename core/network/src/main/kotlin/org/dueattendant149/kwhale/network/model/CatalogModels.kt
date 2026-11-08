@@ -35,6 +35,7 @@ data class Album(
     val trackCount: Int = 0,
     val type: String? = null,
     val explicit: Boolean = false,
+    val isFavorite: Boolean = false,
     val tracks: List<Track> = emptyList(),
     val createdAt: String? = null,
 )
@@ -48,6 +49,7 @@ data class Artist(
     val genres: List<Genre> = emptyList(),
     val followers: Long = 0L,
     val albumCount: Int = 0,
+    val isFavorite: Boolean = false,
     val topTracks: List<Track> = emptyList(),
     val albums: List<Album> = emptyList(),
 )

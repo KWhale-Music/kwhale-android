@@ -1,6 +1,5 @@
 package org.dueattendant149.kwhale.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,6 +26,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -38,14 +37,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
@@ -57,20 +54,14 @@ import org.dueattendant149.kwhale.network.model.HomeResponse
 import org.dueattendant149.kwhale.network.model.HomeSection
 import org.dueattendant149.kwhale.network.model.Mix
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
-import org.dueattendant149.kwhale.player.PlaybackState
-import org.dueattendant149.kwhale.ui.components.AlbumCard
-import org.dueattendant149.kwhale.ui.components.ArtistCard
 import org.dueattendant149.kwhale.ui.components.BannerCard
-import org.dueattendant149.kwhale.ui.components.ContinueCard
 import org.dueattendant149.kwhale.ui.components.ErrorState
-import org.dueattendant149.kwhale.ui.components.PlaylistCard
 import org.dueattendant149.kwhale.ui.components.CardCarouselSkeleton
 import org.dueattendant149.kwhale.ui.components.SectionHeader
 import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 import org.dueattendant149.kwhale.ui.components.TrackRow
 import org.dueattendant149.kwhale.ui.components.TrackTile
-import org.dueattendant149.kwhale.ui.components.imageUrl
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
@@ -78,9 +69,6 @@ import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 @Composable
 fun HomeScreen(
     app: KwhaleApp,
-    playerState: PlaybackState,
-    onOpenPlayer: () -> Unit,
-    onOpenCollection: (String, String) -> Unit,
     onOpenSearch: () -> Unit,
     onSeeAll: (String) -> Unit = {},
     onTrackMenu: (ApiTrack) -> Unit,
@@ -88,11 +76,9 @@ fun HomeScreen(
 ) {
     var home by remember { mutableStateOf<HomeResponse?>(null) }
     var mixes by remember { mutableStateOf<List<Mix>>(emptyList()) }
-    var artists by remember { mutableStateOf<List<org.dueattendant149.kwhale.network.model.Artist>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
-    val liked = remember { mutableStateMapOf<String, Boolean>() }
     var prompt by remember { mutableStateOf("") }
     var promptLoading by remember { mutableStateOf(false) }
     var promptError by remember { mutableStateOf<String?>(null) }
@@ -108,13 +94,8 @@ fun HomeScreen(
                     runCatching { app.api.mixes(kind = "personal", limit = 20).items }
                         .getOrDefault(emptyList())
                 }
-                val artistsDeferred = async {
-                    runCatching { app.api.topArtists(limit = 10).items }
-                        .getOrDefault(emptyList())
-                }
                 home = homeDeferred.await()
                 mixes = mixesDeferred.await()
-                artists = artistsDeferred.await()
             }
         }.onFailure { error = it.message ?: "Ошибка сети" }
         loading = false
@@ -134,10 +115,6 @@ fun HomeScreen(
     }
 
     val sections = home?.sections.orEmpty()
-    val libraryPlaylists = sections.firstOrNull { it.id == "playlists" }
-        ?.items?.mapNotNull { it.playlist }.orEmpty()
-    val libraryAlbums = sections.firstOrNull { it.id == "albums" }
-        ?.items?.mapNotNull { it.album }.orEmpty()
 
     val heroMixes = mixes.filter { it.kind == "personal" || it.kind == "discovery" }
     val moodMixes = mixes.filter { it.kind == "mood" }
@@ -195,15 +172,10 @@ fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Главная",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
+                Spacer(Modifier.weight(1f))
                 IconButton(onClick = onOpenSearch) {
                     Icon(Icons.Rounded.Search, contentDescription = "Поиск")
                 }
@@ -352,53 +324,37 @@ fun HomeScreen(
         }
 
         if (moreMixes.isNotEmpty()) {
-            item { SectionHeader("Жанры и артисты") }
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(moreMixes, key = { it.id }) { mix ->
-                        Card(
-                            modifier = Modifier.width(170.dp),
+                        FilterChip(
+                            selected = false,
                             onClick = { playMix(mix) },
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                        ) {
-                            Column(Modifier.padding(14.dp)) {
+                            label = {
                                 Text(
                                     text = mix.title,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = mix.subtitle ?: "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                            }
-                        }
+                            },
+                        )
                     }
                 }
             }
         }
 
-        playerState.current?.let { current ->
-            item {
-                ContinueCard(
-                    track = current,
-                    progress = playerState.progress,
-                    isPlaying = playerState.isPlaying,
-                    onOpen = onOpenPlayer,
-                    onToggle = app.player::toggle,
-                )
-                Spacer(Modifier.height(4.dp))
-            }
-        }
-
-        sections.filterNot { it.id == "playlists" || it.id == "albums" }.forEach { section ->
+        // Library-owned / duplicated blocks are not rendered on Home:
+        // collections and liked tracks live in Library; personal/discovery
+        // shelves repeat the mix cards above.
+        val homeDuplicates = setOf(
+            "playlists",
+            "albums",
+            "liked",
+            "for_you",
+            "discovery",
+            "moods",
+        )
+        sections.filterNot { it.id in homeDuplicates }.forEach { section ->
             when (section.id) {
                 "recent" -> {
                     item { SectionHeader("Недавно играли", action = "Все", onAction = { onSeeAll("tracks") }) }
@@ -413,55 +369,6 @@ fun HomeScreen(
                         )
                     }
                 }
-                "liked" -> {
-                    item { SectionHeader("Любимое", action = "Все", onAction = { onSeeAll("liked") }) }
-                    TrackItems(
-                        section = section,
-                        app = app,
-                        liked = liked,
-                        onPlay = { tracks, index ->
-                            app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
-                        },
-                        onToggleLike = { track ->
-                            val next = liked[track.id] ?: !track.isLiked
-                            liked[track.id] = next
-                            scope.launch {
-                                runCatching {
-                                    if (next) app.api.like(track.id) else app.api.unlike(track.id)
-                                }
-                            }
-                        },
-                        onMenu = onTrackMenu,
-                    )
-                }
-                "playlists" -> {
-                    item { SectionHeader("Плейлисты", action = "Все", onAction = { onSeeAll("playlists") }) }
-                    item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(section.items.mapNotNull { it.playlist }, key = { it.id }) { playlist ->
-                                PlaylistCard(
-                                    playlist = playlist,
-                                    api = app.api,
-                                    onClick = { onOpenCollection("playlist", playlist.id) },
-                                )
-                            }
-                        }
-                    }
-                }
-                "albums" -> {
-                    item { SectionHeader("Альбомы", action = "Все", onAction = { onSeeAll("albums") }) }
-                    item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(section.items.mapNotNull { it.album }, key = { it.id }) { album ->
-                                AlbumCard(
-                                    album = album,
-                                    api = app.api,
-                                    onClick = { onOpenCollection("album", album.id) },
-                                )
-                            }
-                        }
-                    }
-                }
                 else -> {
                     when (section.kind) {
                         "banner" -> {
@@ -473,7 +380,6 @@ fun HomeScreen(
                             }
                         }
                         "shelf" -> {
-                            // recommendation track shelves (for_you / discovery)
                             item {
                                 SectionHeader(section.title ?: "Треки")
                                 TrackCarousel(
@@ -491,59 +397,20 @@ fun HomeScreen(
                             TrackItems(
                                 section = section,
                                 app = app,
-                                liked = liked,
                                 onPlay = { tracks, index ->
                                     app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
                                 },
                                 onToggleLike = { track ->
-                                    val next = liked[track.id] ?: !track.isLiked
-                                    liked[track.id] = next
                                     scope.launch {
                                         runCatching {
-                                            if (next) app.api.like(track.id) else app.api.unlike(track.id)
+                                            if (track.isLiked) app.api.unlike(track.id)
+                                            else app.api.like(track.id)
                                         }
                                     }
                                 },
                                 onMenu = onTrackMenu,
                             )
                         }
-                    }
-                }
-            }
-        }
-
-        if (libraryPlaylists.isNotEmpty() || libraryAlbums.isNotEmpty()) {
-            item { SectionHeader("Коллекции", action = "Все", onAction = { onSeeAll("collections") }) }
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(libraryPlaylists, key = { "p-${it.id}" }) { playlist ->
-                        PlaylistCard(
-                            playlist = playlist,
-                            api = app.api,
-                            onClick = { onOpenCollection("playlist", playlist.id) },
-                        )
-                    }
-                    items(libraryAlbums, key = { "a-${it.id}" }) { album ->
-                        AlbumCard(
-                            album = album,
-                            api = app.api,
-                            onClick = { onOpenCollection("album", album.id) },
-                        )
-                    }
-                }
-            }
-        }
-
-        if (artists.isNotEmpty()) {
-            item { SectionHeader("Артисты") }
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(artists, key = { it.id }) { artist ->
-                        ArtistCard(
-                            artist = artist,
-                            api = app.api,
-                            onClick = { onOpenCollection("artist", artist.id) },
-                        )
                     }
                 }
             }
@@ -573,19 +440,18 @@ private fun TrackCarousel(
 private fun LazyListScope.TrackItems(
     section: HomeSection,
     app: KwhaleApp,
-    liked: Map<String, Boolean>,
     onPlay: (List<ApiTrack>, Int) -> Unit,
     onToggleLike: (ApiTrack) -> Unit,
     onMenu: (ApiTrack) -> Unit,
 ) {
     val tracks = section.items.mapNotNull { it.track }
     // lazily emitted into the parent LazyColumn (a nested Column rendered the whole
-    // "Любимое" list eagerly, which is O(N) for large libraries)
+    // list eagerly, which is O(N) for large libraries)
     itemsIndexed(tracks, key = { index, track -> "${track.id}-$index" }) { index, track ->
         TrackRow(
             track = track,
             api = app.api,
-            liked = liked[track.id] ?: track.isLiked,
+            liked = track.isLiked,
             onClick = { onPlay(tracks, index) },
             onToggleLike = { onToggleLike(track) },
             onOverflow = { onMenu(track) },

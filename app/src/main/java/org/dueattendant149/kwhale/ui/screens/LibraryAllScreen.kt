@@ -36,13 +36,13 @@ import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
+import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
 import org.dueattendant149.kwhale.ui.components.EmptyState
 import org.dueattendant149.kwhale.ui.components.PlaylistCard
 import org.dueattendant149.kwhale.ui.components.TrackRow
-import org.dueattendant149.kwhale.ui.components.artistLine
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +53,7 @@ fun LibraryAllScreen(
     onOpenCollection: (String, String) -> Unit,
 ) {
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
-    var albums by remember { mutableStateOf<List<LibraryAlbum>>(emptyList()) }
+    var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
     var collections by remember { mutableStateOf<List<LibraryCollection>>(emptyList()) }
     var tracks by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -64,7 +64,7 @@ fun LibraryAllScreen(
         "playlists" -> "Плейлисты"
         "albums" -> "Альбомы"
         "tracks", "liked" -> "Треки"
-        else -> "Коллекции"
+        else -> "Альбомы"
     }
 
     LaunchedEffect(kind) {
@@ -73,41 +73,32 @@ fun LibraryAllScreen(
             "playlists" -> playlists = runCatching {
                 app.api.libraryPlaylists(limit = 100).items
             }.getOrDefault(emptyList())
-            "albums", "collections" -> {
-                tracks = runCatching { app.api.libraryTracks(limit = 200).items }
+            "albums" -> albums = runCatching {
+                app.api.libraryAlbums(limit = 100).items
+            }.getOrDefault(emptyList())
+            "collections" -> {
+                playlists = runCatching { app.api.libraryPlaylists(limit = 100).items }
                     .getOrDefault(emptyList())
-                albums = tracks.mapNotNull { it.album }.distinctBy { it.id }.map { ref ->
-                    val artist = tracks.firstOrNull { it.album?.id == ref.id }?.artistLine().orEmpty()
-                    LibraryAlbum(
-                        id = ref.id,
-                        title = ref.title,
-                        artist = artist.ifBlank { "Альбом" },
-                        coverUrl = ref.cover?.let { app.api.imageUrl(it.id) },
-                        count = tracks.count { it.album?.id == ref.id },
+                albums = runCatching { app.api.libraryAlbums(limit = 100).items }
+                    .getOrDefault(emptyList())
+                collections = playlists.map { playlist ->
+                    LibraryCollection(
+                        key = "p-${playlist.id}",
+                        kind = "playlist",
+                        id = playlist.id,
+                        title = playlist.title,
+                        subtitle = KwhalePlural.tracks(playlist.trackCount),
+                        coverUrl = playlist.cover?.let { app.api.imageUrl(it.id) },
                     )
-                }
-                if (kind == "collections") {
-                    playlists = runCatching { app.api.libraryPlaylists(limit = 100).items }
-                        .getOrDefault(emptyList())
-                    collections = playlists.map { playlist ->
-                        LibraryCollection(
-                            key = "p-${playlist.id}",
-                            kind = "playlist",
-                            id = playlist.id,
-                            title = playlist.title,
-                            subtitle = KwhalePlural.tracks(playlist.trackCount),
-                            coverUrl = playlist.cover?.let { app.api.imageUrl(it.id) },
-                        )
-                    } + albums.map { album ->
-                        LibraryCollection(
-                            key = "a-${album.id}",
-                            kind = "album",
-                            id = album.id,
-                            title = album.title,
-                            subtitle = album.artist,
-                            coverUrl = album.coverUrl,
-                        )
-                    }
+                } + albums.map { album ->
+                    LibraryCollection(
+                        key = "a-${album.id}",
+                        kind = "album",
+                        id = album.id,
+                        title = album.title,
+                        subtitle = album.artists.joinToString(", ") { it.name }.ifBlank { "Альбом" },
+                        coverUrl = album.cover?.let { app.api.imageUrl(it.id) },
+                    )
                 }
             }
             else -> tracks = runCatching { app.api.libraryTracks(limit = 200).items }
@@ -189,9 +180,8 @@ fun LibraryAllScreen(
                         items(albums, key = { it.id }) { album ->
                             Box(Modifier.padding(6.dp)) {
                                 AlbumCard(
-                                    title = album.title,
-                                    artist = album.artist,
-                                    coverUrl = album.coverUrl,
+                                    album = album,
+                                    api = app.api,
                                     onClick = { onOpenCollection("album", album.id) },
                                     width = 150,
                                 )

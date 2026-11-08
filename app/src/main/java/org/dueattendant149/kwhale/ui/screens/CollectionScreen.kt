@@ -28,7 +28,6 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -97,7 +96,10 @@ fun CollectionScreen(
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
-    var likedAll by remember { mutableStateOf(false) }
+    var isFavorite by remember { mutableStateOf(false) }
+    var isFollowed by remember { mutableStateOf(false) }
+    var isOwned by remember { mutableStateOf(false) }
+    var actionBusy by remember { mutableStateOf(false) }
     val liked = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -114,6 +116,7 @@ fun CollectionScreen(
                     meta = listOfNotNull(album.year?.toString(), KwhalePlural.tracks(album.trackCount))
                         .joinToString(" · ")
                     cover = album.imageUrl(app.api)
+                    isFavorite = album.isFavorite
                     tracks = album.tracks.ifEmpty { app.api.albumTracks(collectionId).items }
                 }
                 "artist" -> {
@@ -122,6 +125,7 @@ fun CollectionScreen(
                     subtitle = artist.genres.joinToString(", ") { it.name }
                     meta = "${artist.followers} слушателей"
                     cover = artist.imageUrl(app.api)
+                    isFavorite = artist.isFavorite
                     tracks = artist.topTracks.ifEmpty { app.api.artistTopTracks(collectionId).items }
                     albums = artist.albums.ifEmpty { app.api.artistAlbums(collectionId).items }
                 }
@@ -132,12 +136,64 @@ fun CollectionScreen(
                     meta = KwhalePlural.tracks(playlist.trackCount)
                     cover = playlist.imageUrl(app.api)
                     canEdit = playlist.permissions.canEdit
+                    isOwned = playlist.permissions.canEdit
+                    isFollowed = playlist.isFollowed
                     tracks = playlist.tracks.ifEmpty { app.api.playlistTracks(collectionId).items }
                 }
                 else -> error("Неизвестная коллекция")
             }
         }.onFailure { error = it.message ?: "Ошибка сети" }
         loading = false
+    }
+
+    fun toggleSaved() {
+        if (actionBusy || (kind == "playlist" && isOwned)) return
+        val saved = if (kind == "playlist") isFollowed else isFavorite
+        actionBusy = true
+        scope.launch {
+            runCatching {
+                when (kind) {
+                    "album" -> if (saved) app.api.unlikeAlbum(collectionId) else app.api.likeAlbum(collectionId)
+                    "artist" -> if (saved) app.api.unlikeArtist(collectionId) else app.api.likeArtist(collectionId)
+                    "playlist" -> if (saved) app.api.unfollowPlaylist(collectionId) else app.api.followPlaylist(collectionId)
+                }
+            }.onSuccess {
+                if (kind == "playlist") isFollowed = !saved else isFavorite = !saved
+                Toast.makeText(
+                    context,
+                    if (saved) "Убрано из библиотеки" else "Сохранено в библиотеку",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }.onFailure {
+                Toast.makeText(context, "Не удалось сохранить", Toast.LENGTH_SHORT).show()
+            }
+            actionBusy = false
+        }
+    }
+
+    fun downloadAll() {
+        if (actionBusy || kind == "artist") return
+        actionBusy = true
+        scope.launch {
+            runCatching {
+                when (kind) {
+                    "album" -> app.api.likeAlbumTracks(collectionId)
+                    "playlist" -> app.api.likePlaylistTracks(collectionId)
+                    else -> error("unsupported kind")
+                }
+            }.onSuccess { result ->
+                val total = result.liked + result.alreadyLiked
+                val suffix = if (result.failed > 0) ", ошибок: ${result.failed}" else ""
+                Toast.makeText(
+                    context,
+                    "Скачивается треков: $total$suffix",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }.onFailure {
+                Toast.makeText(context, "Не удалось поставить в загрузку", Toast.LENGTH_SHORT).show()
+            }
+            actionBusy = false
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -248,52 +304,28 @@ fun CollectionScreen(
                 }
             }
             item {
+                val saved = if (kind == "playlist") isFollowed else isFavorite
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    ActionItem(
-                        icon = if (likedAll) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        label = if (likedAll) "Добавлено" else "Добавить",
-                    ) {
-                        when {
-                            kind == "artist" -> {
-                                // follow-artist endpoint не реализован — не врём об успехе
-                                Toast.makeText(context, "Подписка на артиста скоро", Toast.LENGTH_SHORT).show()
-                            }
-                            likedAll -> {
-                                // unlike-all не реализован — не притворяемся, что выключаем
-                                Toast.makeText(context, "Уже в библиотеке", Toast.LENGTH_SHORT).show()
-                            }
-                            else -> {
-                                val previous = likedAll
-                                likedAll = true
-                                scope.launch {
-                                    runCatching {
-                                        when (kind) {
-                                            "album" -> app.api.likeAlbumTracks(collectionId)
-                                            "playlist" -> app.api.likePlaylistTracks(collectionId)
-                                            else -> Unit
-                                        }
-                                    }.onSuccess {
-                                        Toast.makeText(context, "Добавлено в библиотеку", Toast.LENGTH_SHORT).show()
-                                    }.onFailure {
-                                        likedAll = previous
-                                        Toast.makeText(context, "Не удалось добавить", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        }
+                    if (!(kind == "playlist" && isOwned)) {
+                        ActionItem(
+                            icon = if (saved) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            label = if (saved) "Добавлено" else "Добавить",
+                            enabled = !actionBusy,
+                            onClick = { toggleSaved() },
+                        )
                     }
-                    ActionItem(icon = Icons.Rounded.Download, label = "Скачать") {
-                        Toast.makeText(context, "Скачивание коллекции скоро", Toast.LENGTH_SHORT).show()
-                    }
-                    ActionItem(icon = Icons.Rounded.QueueMusic, label = "В очередь") {
-                        if (tracks.isNotEmpty()) {
-                            app.player.addQueue(tracks.map { it.toUi(app.api) })
-                        }
+                    if (kind != "artist") {
+                        ActionItem(
+                            icon = Icons.Rounded.Download,
+                            label = "Скачать всё",
+                            enabled = !actionBusy,
+                            onClick = { downloadAll() },
+                        )
                     }
                 }
             }
@@ -423,20 +455,24 @@ fun CollectionScreen(
 private fun ActionItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f)
     Column(
         modifier = Modifier
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+        Icon(icon, contentDescription = null, tint = tint)
         Spacer(Modifier.height(4.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                alpha = if (enabled) 1f else 0.38f,
+            ),
             maxLines = 1,
         )
     }
