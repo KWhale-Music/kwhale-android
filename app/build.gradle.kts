@@ -21,7 +21,9 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            buildConfigField("String", "API_BASE_URL", "\"http://127.0.0.1:19001/v1\"")
+            // LAN dev host (KWhale API :19001, cleartext allowed in
+            // network_security_config). For adb-reverse use 127.0.0.1 instead.
+            buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.229:19001/v1\"")
         }
         release {
             isMinifyEnabled = true

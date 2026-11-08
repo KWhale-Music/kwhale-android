@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <!-- Base: HTTPS only. Cleartext is limited to the local self-hosted dev server
-         (adb-reverse) and the Android emulator loopback. The public release API
-         (https://music.dueattendant149.org) rides on TLS. -->
+         (adb-reverse, Android emulator loopback, LAN dev host). The public release
+         API (https://music.dueattendant149.org) rides on TLS. -->
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">127.0.0.1</domain>
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- LAN dev host (KWhale API :19001) and the Caddy dev host -->
+        <domain includeSubdomains="false">192.168.1.229</domain>
+        <domain includeSubdomains="false">192.168.1.119</domain>
     </domain-config>
 </network-security-config>
