@@ -117,7 +117,7 @@ fun LibraryScreen(
     // Library albums are explicitly saved cards only. They are NOT derived from
     // liked tracks: liking one track must not add its whole album to the library.
     val collections = remember(playlists, albums, app) {
-        playlists.map { playlist ->
+        (playlists.map { playlist ->
             LibraryCollection(
                 key = "p-${playlist.id}",
                 kind = "playlist",
@@ -125,6 +125,7 @@ fun LibraryScreen(
                 title = playlist.title,
                 subtitle = KwhalePlural.tracks(playlist.trackCount),
                 coverUrl = playlist.imageUrl(app.api),
+                addedAt = playlist.createdAt,
             )
         } + albums.map { album ->
             LibraryCollection(
@@ -134,8 +135,12 @@ fun LibraryScreen(
                 title = album.title,
                 subtitle = album.artists.joinToString(", ") { it.name }.ifBlank { "Альбом" },
                 coverUrl = album.imageUrl(app.api),
+                addedAt = album.addedAt,
             )
-        }
+        }).sortedWith(
+            compareByDescending<LibraryCollection> { it.addedAt ?: "" }
+                .thenBy { it.title.lowercase() },
+        )
     }
 
     LazyColumn(

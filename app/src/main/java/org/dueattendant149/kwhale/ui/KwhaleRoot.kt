@@ -132,6 +132,10 @@ fun KwhaleRoot(
     monet: Boolean,
     onThemeChanged: (org.dueattendant149.kwhale.design.ThemeMode, Int, Boolean) -> Unit,
     onLogout: () -> Unit,
+    openQueue: Boolean = false,
+    onQueueOpened: () -> Unit = {},
+    openPlayer: Boolean = false,
+    onPlayerOpened: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val playerState by app.player.state.collectAsState()
@@ -151,6 +155,18 @@ fun KwhaleRoot(
 
     LaunchedEffect(playerState.current) {
         if (playerState.current == null) showPlayer = false
+    }
+    LaunchedEffect(openQueue) {
+        if (openQueue) {
+            showQueue = true
+            onQueueOpened()
+        }
+    }
+    LaunchedEffect(openPlayer) {
+        if (openPlayer) {
+            showPlayer = true
+            onPlayerOpened()
+        }
     }
 
     Box(Modifier.fillMaxSize()) {

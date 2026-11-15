@@ -13,8 +13,8 @@ android {
         applicationId = "org.dueattendant149.kwhale"
         minSdk = 31
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.1.7"
+        versionCode = 22
+        versionName = "0.1.12"
         buildConfigField("String", "API_BASE_URL", "\"https://music.dueattendant149.org/v1\"")
     }
 

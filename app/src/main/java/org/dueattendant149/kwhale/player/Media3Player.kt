@@ -3,6 +3,7 @@ package org.dueattendant149.kwhale.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import android.util.Log
 import androidx.media3.common.MediaItem
@@ -48,6 +49,9 @@ class Media3Player(
     private var pendingIndex: Int = 0
     private var currentSurface: String = "player"
     private var lastIndex: Int = 0
+    private var playRequestedAt: Long = 0L
+    private var loggedReadyKey: String? = null
+    private var retriedErrorKey: String? = null
 
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -68,10 +72,23 @@ class Media3Player(
                     events.complete(track, currentSurface, ctrl?.duration)
                 }
             }
+            if (playbackState == Player.STATE_READY && playRequestedAt > 0L) {
+                val idx = controller?.currentMediaItemIndex ?: -1
+                val track = queue.getOrNull(idx)
+                val key = track?.let { it.remoteId ?: it.id.toString() }
+                if (track != null && key != null && key != loggedReadyKey) {
+                    val elapsed = SystemClock.elapsedRealtime() - playRequestedAt
+                    Log.i("KWhalePrefetch", "first-frame ${elapsed}ms (${track.title})")
+                    loggedReadyKey = key
+                }
+            }
             publish()
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            playRequestedAt = SystemClock.elapsedRealtime()
+            loggedReadyKey = null
+            retriedErrorKey = null
             val ctrl = controller
             val newIdx = ctrl?.currentMediaItemIndex ?: 0
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
@@ -93,6 +110,37 @@ class Media3Player(
         override fun onPlayerError(error: PlaybackException) {
             Log.e("KWhale", "playback error: ${error.errorCodeName}", error)
             _playbackError.value = error.errorCodeName
+            val ctrl = controller
+            val track = queue.getOrNull(ctrl?.currentMediaItemIndex ?: -1)
+            val key = track?.let { it.remoteId ?: it.id.toString() }
+            val retryableIoError = error.errorCode in setOf(
+                PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+                PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
+                PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED,
+                PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE,
+            )
+            if (ctrl != null && key != null && retryableIoError && retriedErrorKey != key) {
+                // One quick retry per item: the stream proxy can hit a transient
+                // upstream read error, and the token refresh path may have just
+                // rotated the Authorization header.
+                retriedErrorKey = key
+                val pos = if (error.errorCode == PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE) {
+                    0L
+                } else {
+                    ctrl.currentPosition.coerceAtLeast(0L)
+                }
+                playRequestedAt = SystemClock.elapsedRealtime()
+                loggedReadyKey = null
+                ctrl.prepare()
+                ctrl.seekTo(pos)
+                ctrl.play()
+                _playbackError.value = null
+                return
+            }
             publish()
         }
     }
@@ -128,6 +176,8 @@ class Media3Player(
         }
         pendingQueue = null
         queue = tracks
+        playRequestedAt = SystemClock.elapsedRealtime()
+        loggedReadyKey = null
         val safeIndex = startIndex.coerceIn(0, tracks.lastIndex)
         lastIndex = safeIndex
         val items = tracks.map(::mediaItemFor)
@@ -151,6 +201,8 @@ class Media3Player(
         queue = queue + tracks
         current.addMediaItems(tracks.map(::mediaItemFor))
         if (wasEmpty) {
+            playRequestedAt = SystemClock.elapsedRealtime()
+            loggedReadyKey = null
             current.prepare()
             current.play()
             queue.getOrNull(0)?.let { events.play(it, currentSurface) }
@@ -213,6 +265,8 @@ class Media3Player(
     fun jumpTo(index: Int) {
         val current = controller ?: return
         if (index !in queue.indices) return
+        playRequestedAt = SystemClock.elapsedRealtime()
+        loggedReadyKey = null
         current.seekToDefaultPosition(index)
         current.play()
         lastIndex = index
@@ -306,8 +360,11 @@ class Media3Player(
         val metadata = MediaMetadata.Builder()
             .setTitle(track.title)
             .setArtist(track.artist)
+            // Car head units often show the album tag where the app shows the
+            // title. Broadcast the title as the album as well; the in-app UI
+            // renders Track.album, so nothing changes on screen.
+            .setAlbumTitle(track.title)
             .apply {
-                track.album?.takeIf { it.isNotBlank() }?.let { setAlbumTitle(it) }
                 track.coverUrl?.takeIf { it.isNotBlank() }?.let {
                     setArtworkUri(Uri.parse(it))
                 }
@@ -316,6 +373,9 @@ class Media3Player(
 
         return MediaItem.Builder()
             .setMediaId(track.id.toString())
+            // Key by the stable remote id, so the playback cache survives a
+            // base-URL change and prefetch/playback share the same entry.
+            .setCustomCacheKey("track:${track.remoteId ?: track.id}")
             .setUri(uriFor(track))
             .setMediaMetadata(metadata)
             .build()

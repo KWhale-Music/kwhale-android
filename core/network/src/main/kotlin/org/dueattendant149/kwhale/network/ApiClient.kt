@@ -33,8 +33,10 @@ class ApiClient(
         .build()
 
     private val authenticatedClient: OkHttpClient = plainClient.newBuilder()
-        .addInterceptor(AuthInterceptor(tokenStore) { refreshBlocking() })
+        .addInterceptor(AuthInterceptor(tokenStore) { stale -> refreshSession(stale) })
         .build()
+
+    private val refreshLock = Any()
 
     suspend fun <T> get(
         path: String,
@@ -213,8 +215,22 @@ class ApiClient(
     }
 
     /**
-     * Called from OkHttp's dispatcher thread by [AuthInterceptor]. Must stay blocking.
+     * Single-flight refresh shared by the OkHttp [AuthInterceptor] and the
+     * ExoPlayer data source. [staleAccessToken] is the token whose request just
+     * got a 401: if another caller has already rotated the session, return the
+     * new one instead of burning the (now revoked) refresh token again. The
+     * server revokes the old refresh token on every rotation, so two blind
+     * refreshes would log the user out.
      */
+    fun refreshSession(staleAccessToken: String? = null): Session? = synchronized(refreshLock) {
+        val current = tokenStore.load()
+        if (current != null && staleAccessToken != null && current.accessToken != staleAccessToken) {
+            current
+        } else {
+            refreshBlocking()
+        }
+    }
+
     private fun refreshBlocking(): Session? {
         val current = tokenStore.load() ?: return null
         val body = json.encodeToString(RefreshRequest.serializer(), RefreshRequest(current.refreshToken))

@@ -32,19 +32,26 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.player.PlaybackCache
 import org.dueattendant149.kwhale.ui.components.CoverArt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,7 +64,10 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val showAbout = remember { mutableStateOf(false) }
+    val showCache = remember { mutableStateOf(false) }
     val settings = (context.applicationContext as KwhaleApp).settings
+    var prefetchEnabled by remember { mutableStateOf(settings.prefetchEnabled) }
+    val scope = rememberCoroutineScope()
     val llmEndpoint = remember { mutableStateOf(settings.llmEndpoint) }
     val llmApiKey = remember { mutableStateOf(settings.llmApiKey) }
     val llmModel = remember { mutableStateOf(settings.llmModel) }
@@ -90,6 +100,18 @@ fun SettingsScreen(
             }
             SettingsRow("Оформление", Icons.Rounded.Palette, onAppearance)
             SettingsRow("Загрузки", Icons.Rounded.CloudDownload, onDownloads)
+            SettingsToggleRow(
+                title = "Предзагрузка очереди",
+                subtitle = "5 треков вперёд. Wi-Fi — целиком, мобильная сеть — 4 МБ на трек",
+                checked = prefetchEnabled,
+                onCheckedChange = {
+                    prefetchEnabled = it
+                    settings.prefetchEnabled = it
+                },
+            )
+            SettingsRow("Кэш воспроизведения", Icons.Rounded.PlayCircle) {
+                showCache.value = true
+            }
             SettingsRow("Уведомления", Icons.Rounded.Notifications) {
                 val granted = Build.VERSION.SDK_INT < 33 ||
                     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -152,6 +174,30 @@ fun SettingsScreen(
             },
         )
     }
+
+    if (showCache.value) {
+        val playbackCache = remember { PlaybackCache.get(context) }
+        AlertDialog(
+            onDismissRequest = { showCache.value = false },
+            title = { Text("Кэш воспроизведения") },
+            text = {
+                Text(
+                    "${playbackCache.usedMb} МБ из ${playbackCache.maxMb} МБ.\n\n" +
+                        "Сюда попадают следующие 5 треков очереди и уже прослушанное. " +
+                        "Ручные загрузки здесь не лежат и не удаляются.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCache.value = false
+                    scope.launch(Dispatchers.IO) { playbackCache.clear() }
+                }) { Text("Очистить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCache.value = false }) { Text("Закрыть") }
+            },
+        )
+    }
 }
 
 @Composable
@@ -167,5 +213,23 @@ private fun SettingsRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
+    )
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle) },
+        trailingContent = {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.fillMaxWidth(),
     )
 }

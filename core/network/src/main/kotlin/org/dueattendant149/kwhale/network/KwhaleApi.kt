@@ -49,6 +49,9 @@ class KwhaleApi(
     val tokenStore: TokenStore get() = client.tokenStore
 
     fun session(): Session? = tokenStore.load()
+    /** Blocking single-flight refresh used by the media data source on a 401. */
+    fun refreshSession(staleAccessToken: String? = null): Session? =
+        client.refreshSession(staleAccessToken)
     fun saveSession(session: Session) = tokenStore.save(session)
     fun clearSession() = tokenStore.clear()
 

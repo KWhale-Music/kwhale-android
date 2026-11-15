@@ -6,6 +6,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
@@ -17,6 +18,7 @@ import org.dueattendant149.kwhale.KwhaleApp
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private var prefetcher: QueuePrefetcher? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -24,8 +26,22 @@ class PlaybackService : MediaSessionService() {
         val httpFactory = AuthHttpDataSourceFactory(
             tokenProvider = { app.api.session()?.accessToken },
             allowedHost = { app.api.config.baseHost },
+            refreshToken = { stale -> app.api.refreshSession(stale) },
         )
-        val dataSourceFactory = DefaultDataSource.Factory(this, httpFactory)
+        val upstreamFactory = DefaultDataSource.Factory(this, httpFactory)
+        val playbackCache = PlaybackCache.get(this)
+
+        val cachedFactory = CacheDataSource.Factory()
+            .setCache(playbackCache.cache)
+            .setUpstreamDataSourceFactory(upstreamFactory)
+            // A full/corrupt cache must never stop playback; skip the cache
+            // and stream directly instead.
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+
+        val dataSourceFactory = SchemeRoutingDataSourceFactory(
+            cached = cachedFactory,
+            direct = DefaultDataSource.Factory(this),
+        )
         val exoPlayer = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
@@ -39,6 +55,14 @@ class PlaybackService : MediaSessionService() {
                 )
                 setHandleAudioBecomingNoisy(true)
             }
+
+        prefetcher = QueuePrefetcher(
+            context = this,
+            cache = playbackCache.cache,
+            upstreamFactory = upstreamFactory,
+            settings = app.settings,
+            player = exoPlayer,
+        )
 
         val sessionActivity = PendingIntent.getActivity(
             this,
@@ -66,6 +90,8 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        prefetcher?.release()
+        prefetcher = null
         mediaSession?.run {
             player.release()
             release()

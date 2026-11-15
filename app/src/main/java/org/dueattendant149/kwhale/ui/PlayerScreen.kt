@@ -125,12 +125,28 @@ fun PlayerScreen(
         label = "playerLikeScale",
     )
 
+    // The target carries the artwork it belongs to. Reading the outer `track`
+    // inside AnimatedContent made the outgoing layer render the incoming cover
+    // and left the previous blurred background on screen until Coil finished.
+    val artwork = PlayerArtwork(
+        id = track.remoteId ?: track.id.toString(),
+        coverUrl = track.coverUrl,
+        title = track.title,
+    )
+
     Box(Modifier.fillMaxSize()) {
-        PlayerBackground(
-            coverUrl = track.coverUrl,
-            seed = track.title,
-            isLight = isLight,
-        )
+        AnimatedContent(
+            targetState = artwork,
+            transitionSpec = { fadeIn(tween(320)) togetherWith fadeOut(tween(180)) },
+            label = "playerBackground",
+            modifier = Modifier.fillMaxSize(),
+        ) { art ->
+            PlayerBackground(
+                coverUrl = art.coverUrl,
+                seed = art.title,
+                isLight = isLight,
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -195,13 +211,13 @@ fun PlayerScreen(
             // cover-less track gets its own gradient + initial.
             val shape = RoundedCornerShape(20.dp)
             AnimatedContent(
-                targetState = track.remoteId ?: track.id.toString(),
+                targetState = artwork,
                 transitionSpec = { fadeIn(tween(280)) togetherWith fadeOut(tween(160)) },
                 label = "artwork",
-            ) { targetId ->
-                key(targetId) {
+            ) { art ->
+                key(art.id) {
                     CoverArt(
-                        imageUrl = track.coverUrl,
+                        imageUrl = art.coverUrl,
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
@@ -211,7 +227,7 @@ fun PlayerScreen(
                             ),
                         shape = shape,
                         iconSize = 64,
-                        seed = track.title,
+                        seed = art.title,
                     )
                 }
             }
@@ -510,10 +526,23 @@ private fun EqualizerIndicator(
     }
 }
 
+private data class PlayerArtwork(
+    val id: String,
+    val coverUrl: String?,
+    val title: String,
+)
+
 @Composable
 private fun PlayerBackground(coverUrl: String?, seed: String, isLight: Boolean) {
     val gradient = remember(seed, isLight) { KwhaleCoverPalette.gradient(seed, isLight) }
-    Box(Modifier.fillMaxSize()) {
+    // The gradient plate is always painted: while the next cover is loading
+    // the old one has already faded out, and a transparent layer would show
+    // the window background for a second.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.linearGradient(gradient)),
+    ) {
         if (!coverUrl.isNullOrBlank()) {
             AsyncImage(
                 model = coverUrl,
@@ -523,8 +552,6 @@ private fun PlayerBackground(coverUrl: String?, seed: String, isLight: Boolean) 
                     .fillMaxSize()
                     .blur(32.dp),
             )
-        } else {
-            Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient)))
         }
         // Scrim keeps text legible over any artwork brightness.
         Box(

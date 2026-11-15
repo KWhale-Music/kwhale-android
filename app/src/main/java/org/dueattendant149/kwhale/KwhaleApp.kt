@@ -21,6 +21,7 @@ import org.dueattendant149.kwhale.network.ApiFactory
 import org.dueattendant149.kwhale.network.HostPolicyInterceptor
 import org.dueattendant149.kwhale.network.KwhaleApi
 import org.dueattendant149.kwhale.player.Media3Player
+import org.dueattendant149.kwhale.widget.PlayerSnapshotStore
 import org.dueattendant149.kwhale.widget.PlayerWidget
 import java.util.UUID
 
@@ -44,6 +45,9 @@ class KwhaleApp : Application() {
     lateinit var cache: ContentCache
         private set
 
+    lateinit var widgetSnapshot: PlayerSnapshotStore
+        private set
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
@@ -51,14 +55,21 @@ class KwhaleApp : Application() {
         cache = ContentCache(this)
         settings = SettingsStore(this)
         downloads = DownloadStore(this)
+        widgetSnapshot = PlayerSnapshotStore(this)
         initApiAndEvents(settings.apiBaseUrl)
         player = Media3Player(this, appScope, downloads, events)
 
         appScope.launch {
             player.state
-                .map { it.current?.id to it.isPlaying }
+                .map { Triple(it.current, it.isPlaying, it.current?.coverUrl) }
                 .distinctUntilChanged()
-                .collect {
+                .collect { (track, isPlaying, _) ->
+                    if (track != null) {
+                        widgetSnapshot.save(track, isPlaying)
+                    } else {
+                        // Keep the last track visible on the widget, just paused.
+                        widgetSnapshot.setPlaying(false)
+                    }
                     runCatching { PlayerWidget().updateAll(this@KwhaleApp) }
                 }
         }

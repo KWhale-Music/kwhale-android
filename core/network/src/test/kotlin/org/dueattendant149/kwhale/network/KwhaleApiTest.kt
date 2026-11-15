@@ -1,5 +1,8 @@
 package org.dueattendant149.kwhale.network
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -73,6 +76,36 @@ class KwhaleApiTest {
         assertTrue(request.body.readUtf8().contains("\"email\":\"demo@kwhale.local\""))
         assertEquals("test", request.getHeader("X-Client-Version"))
         assertEquals("test-device", request.getHeader("X-Device-Id"))
+    }
+
+    @Test
+    fun concurrentRefreshUsesOneServerRotation() {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(authJson("access-2", "refresh-2")),
+        )
+        val initial = Session(
+            accessToken = "access-1",
+            refreshToken = "refresh-1",
+            expiresAtEpochSec = Long.MAX_VALUE,
+            user = User(id = "user_1", displayName = "Demo"),
+        )
+        val api = ApiFactory.createInMemory(config(), initial)
+
+        val (first, second) = runBlocking {
+            coroutineScope {
+                val a = async(Dispatchers.IO) { api.refreshSession("access-1") }
+                val b = async(Dispatchers.IO) { api.refreshSession("access-1") }
+                a.await() to b.await()
+            }
+        }
+
+        assertEquals("access-2", first?.accessToken)
+        assertEquals("access-2", second?.accessToken)
+        assertEquals(1, server.requestCount)
+        assertEquals("/v1/auth/refresh", server.takeRequest().path)
     }
 
     @Test

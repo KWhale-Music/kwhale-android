@@ -17,7 +17,7 @@ class HostPolicyInterceptor(private val allowedHost: String) : Interceptor {
 
 class AuthInterceptor(
     private val tokenStore: TokenStore,
-    private val refresh: () -> Session?,
+    private val refresh: (String?) -> Session?,
 ) : Interceptor {
 
     private val lock = Any()
@@ -44,7 +44,7 @@ class AuthInterceptor(
             if (latest != null && latest.accessToken != session.accessToken) {
                 latest
             } else {
-                refresh()
+                refresh(session.accessToken)
             }
         } ?: return chain.proceed(original)
 

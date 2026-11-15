@@ -7,4 +7,5 @@ internal data class LibraryCollection(
     val title: String,
     val subtitle: String,
     val coverUrl: String?,
+    val addedAt: String?,
 )

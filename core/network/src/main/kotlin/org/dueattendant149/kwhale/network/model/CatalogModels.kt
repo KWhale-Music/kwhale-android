@@ -39,6 +39,7 @@ data class Album(
     val isFavorite: Boolean = false,
     val tracks: List<Track> = emptyList(),
     val createdAt: String? = null,
+    val addedAt: String? = null,
 )
 
 @Serializable

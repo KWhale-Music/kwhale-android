@@ -28,9 +28,13 @@ import org.dueattendant149.kwhale.ui.KwhaleRoot
 class MainActivity : ComponentActivity() {
 
     private lateinit var app: KwhaleApp
+    private var openQueue by mutableStateOf(false)
+    private var openPlayer by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         app = application as KwhaleApp
+        openQueue = intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)
+        openPlayer = intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)
         if (app.api.session() == null) {
             startActivity(
                 Intent(this, AuthActivity::class.java).apply {
@@ -79,9 +83,20 @@ class MainActivity : ComponentActivity() {
                         app.settings.monet = dynamic
                     },
                     onLogout = ::performLogout,
+                    openQueue = openQueue,
+                    onQueueOpened = { openQueue = false },
+                    openPlayer = openPlayer,
+                    onPlayerOpened = { openPlayer = false },
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openQueue = intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)
+        openPlayer = intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)
     }
 
     private fun requestNotificationPermission() {
@@ -104,5 +119,10 @@ class MainActivity : ComponentActivity() {
             )
             finish()
         }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_QUEUE = "org.dueattendant149.kwhale.OPEN_QUEUE"
+        const val EXTRA_OPEN_PLAYER = "org.dueattendant149.kwhale.OPEN_PLAYER"
     }
 }

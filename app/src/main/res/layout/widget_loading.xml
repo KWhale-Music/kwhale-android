@@ -2,8 +2,8 @@
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121212"
+    android:background="@drawable/widget_loading_bg"
     android:gravity="center"
     android:text="KWhale"
-    android:textColor="#FFFFFF"
+    android:textColor="#F5F2FA"
     android:textSize="16sp" />

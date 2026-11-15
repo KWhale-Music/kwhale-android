@@ -52,11 +52,14 @@ class SettingsStore(context: Context) {
         get() = prefs.getString("llm_model", "").orEmpty()
         set(value) { prefs.edit().putString("llm_model", value.trim()).apply() }
 
+    // ── Playback queue prefetch (5 tracks ahead) ────────────────────────
+    var prefetchEnabled: Boolean
+        get() = prefs.getBoolean("prefetch_enabled", true)
+        set(value) { prefs.edit().putBoolean("prefetch_enabled", value).apply() }
+
     companion object {
-        fun normalizeBaseUrl(raw: String): String {
-            val trimmed = raw.trim().trimEnd('/')
-            if (trimmed.isEmpty()) return BuildConfig.API_BASE_URL
-            return if (trimmed.endsWith("/v1")) trimmed else "$trimmed/v1"
-        }
+        fun normalizeBaseUrl(raw: String): String =
+            org.dueattendant149.kwhale.network.ServerUrl.normalize(raw, BuildConfig.API_BASE_URL)
+                ?: BuildConfig.API_BASE_URL
     }
 }

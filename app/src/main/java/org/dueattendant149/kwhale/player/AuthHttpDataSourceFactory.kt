@@ -14,6 +14,8 @@ import androidx.media3.datasource.HttpDataSource
 class AuthHttpDataSourceFactory(
     private val tokenProvider: () -> String?,
     private val allowedHost: () -> String? = { null },
+    /** Called once on HTTP 401 with the stale token, then the open is retried. */
+    private val refreshToken: ((String?) -> Unit)? = null,
     private val delegate: HttpDataSource.Factory = DefaultHttpDataSource.Factory(),
 ) : HttpDataSource.Factory {
 
@@ -29,15 +31,25 @@ class AuthHttpDataSourceFactory(
                         "Blocked non-API media host: ${dataSpec.uri.host}",
                     )
                 }
-                val token = tokenProvider()
-                val authorized = if (token.isNullOrBlank()) {
-                    dataSpec
-                } else {
-                    dataSpec.withAdditionalHeaders(
-                        mapOf("Authorization" to "Bearer $token"),
-                    )
+                fun authorized(spec: DataSpec): DataSpec {
+                    val token = tokenProvider()
+                    return if (token.isNullOrBlank()) {
+                        spec
+                    } else {
+                        spec.withAdditionalHeaders(
+                            mapOf("Authorization" to "Bearer $token"),
+                        )
+                    }
                 }
-                return source.open(authorized)
+
+                val staleToken = tokenProvider()
+                return try {
+                    source.open(authorized(dataSpec))
+                } catch (e: HttpDataSource.InvalidResponseCodeException) {
+                    if (e.responseCode != 401 || refreshToken == null) throw e
+                    refreshToken(staleToken)
+                    source.open(authorized(dataSpec))
+                }
             }
         }
     }
