@@ -8,6 +8,7 @@ import org.dueattendant149.kwhale.network.model.Artist
 import org.dueattendant149.kwhale.network.model.ArtistSyncStatus
 import org.dueattendant149.kwhale.network.model.ArtistsPage
 import org.dueattendant149.kwhale.network.model.AuthResponse
+import org.dueattendant149.kwhale.network.model.AppRelease
 import org.dueattendant149.kwhale.network.model.CensorshipReportRequest
 import org.dueattendant149.kwhale.network.model.CensorshipReportResponse
 import org.dueattendant149.kwhale.network.model.Config
@@ -324,6 +325,21 @@ class KwhaleApi(
 
     suspend fun cancelCensorshipReport(trackId: String) =
         client.deleteUnit("/tracks/$trackId/censorship")
+
+    // ---- app updates --------------------------------------------------------
+
+    /** Newest published client; 404 (null) when nothing is published yet. */
+    suspend fun appReleaseLatest(): AppRelease? = try {
+        client.get("/app-release/latest", AppRelease.serializer())
+    } catch (e: ApiException) {
+        if (e.statusCode == 404) null else throw e
+    }
+
+    /** Stream the APK to [target] with progress (bytesRead, totalBytes). */
+    suspend fun downloadAppRelease(
+        target: java.io.File,
+        onProgress: (Long, Long) -> Unit = { _, _ -> },
+    ): java.io.File = client.downloadTo("/app-release/apk", target, onProgress)
 
     suspend fun lyrics(trackId: String): Lyrics =
         client.get("/tracks/$trackId/lyrics", Lyrics.serializer())

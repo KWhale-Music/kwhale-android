@@ -384,6 +384,32 @@ paths:
       responses:
         '204': { description: Отчёт снят }
 
+  /app-release/latest:
+    get:
+      tags: [App]
+      operationId: appReleaseLatest
+      description: Последняя опубликованная версия клиента для in-app обновления (сравнение по versionCode). 404 — публикаций нет.
+      responses:
+        '200':
+          description: Метаданные релиза
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppRelease' }
+        '404': { description: Нет опубликованных релизов }
+
+  /app-release/apk:
+    get:
+      tags: [App]
+      operationId: downloadAppRelease
+      description: APK последнего релиза (единый origin, без внешних URL).
+      responses:
+        '200':
+          description: Файл APK
+          content:
+            application/vnd.android.package-archive:
+              schema: { type: string, format: binary }
+        '404': { description: Нет опубликованных релизов }
+
   /albums/{albumId}:
     get:
       tags: [Albums]
@@ -1304,6 +1330,19 @@ components:
         ok: { type: boolean }
         reportId: { type: string }
         status: { type: string, enum: [pending, resolved, rejected] }
+
+    AppRelease:
+      type: object
+      required: [versionCode, versionName]
+      properties:
+        id: { type: string }
+        versionCode: { type: integer }
+        versionName: { type: string }
+        notes: { type: string }
+        sha256: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        downloadUrl: { type: string }
 
     ArtistSyncStatus:
       type: object

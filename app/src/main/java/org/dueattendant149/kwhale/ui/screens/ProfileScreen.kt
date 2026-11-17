@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -295,6 +296,13 @@ fun ProfileScreen(
         }
         item {
             ProfileRow("Настройки", Icons.Rounded.Settings, onSettings)
+        }
+        item {
+            ProfileRow(
+                title = "Проверить обновления",
+                icon = Icons.Rounded.SystemUpdate,
+                onClick = { app.updater.checkManual() },
+            )
         }
         item {
             ProfileRow("О приложении", Icons.Rounded.Info, onClick = { showAbout = true })

@@ -134,6 +134,18 @@ data class CensorshipReportResponse(
 )
 
 @Serializable
+data class AppRelease(
+    val id: String = "",
+    val versionCode: Int = 0,
+    val versionName: String = "",
+    val notes: String? = null,
+    val sha256: String? = null,
+    val sizeBytes: Long = 0L,
+    val createdAt: String? = null,
+    val downloadUrl: String? = null,
+)
+
+@Serializable
 data class SearchTop(
     val type: String = "",
     val track: Track? = null,

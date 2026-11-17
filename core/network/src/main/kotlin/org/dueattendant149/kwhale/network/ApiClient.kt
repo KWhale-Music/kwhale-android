@@ -102,6 +102,44 @@ class ApiClient(
         return execute(authenticatedClient, request, serializer)
     }
 
+    /**
+     * Download a binary payload (APK) to [target] with progress callbacks.
+     * Authenticated, single-origin, streamed to disk — never held in memory.
+     */
+    suspend fun downloadTo(
+        path: String,
+        target: File,
+        onProgress: ((bytesRead: Long, total: Long) -> Unit)? = null,
+    ): File = withContext(Dispatchers.IO) {
+        val request = buildRequest("GET", path, null, emptyMap())
+        authenticatedClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw problem(response.code, response.body?.string().orEmpty())
+            }
+            val body = response.body ?: throw ApiException(502, null, "пустой ответ")
+            val total = body.contentLength()
+            val tmp = File(target.parentFile, "${target.name}.part")
+            tmp.outputStream().use { out ->
+                var read = 0L
+                body.byteStream().use { input ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n <= 0) break
+                        out.write(buf, 0, n)
+                        read += n
+                        onProgress?.invoke(read, total)
+                    }
+                }
+            }
+            if (!tmp.renameTo(target)) {
+                target.delete()
+                tmp.renameTo(target)
+            }
+            target
+        }
+    }
+
     suspend fun postUnit(
         path: String,
         body: String? = null,

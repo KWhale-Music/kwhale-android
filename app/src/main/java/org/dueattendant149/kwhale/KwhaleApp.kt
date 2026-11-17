@@ -17,6 +17,7 @@ import org.dueattendant149.kwhale.analytics.EventTracker
 import org.dueattendant149.kwhale.data.ApiReactionGateway
 import org.dueattendant149.kwhale.data.ContentCache
 import org.dueattendant149.kwhale.data.SearchSession
+import org.dueattendant149.kwhale.update.AppUpdater
 import org.dueattendant149.kwhale.data.TrackReactionStore
 import org.dueattendant149.kwhale.download.DownloadObserver
 import org.dueattendant149.kwhale.download.DownloadStore
@@ -56,6 +57,14 @@ class KwhaleApp : Application() {
         private set
 
     val searchSession: SearchSession = SearchSession()
+
+    val updater: AppUpdater by lazy {
+        AppUpdater(
+            apiProvider = { api },
+            scope = appScope,
+            currentVersionCode = { BuildConfig.VERSION_CODE },
+        )
+    }
 
     lateinit var widgetSnapshot: PlayerSnapshotStore
         private set

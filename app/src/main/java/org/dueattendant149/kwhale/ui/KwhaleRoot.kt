@@ -105,6 +105,8 @@ import org.dueattendant149.kwhale.download.Downloads
 import org.dueattendant149.kwhale.model.Track as UiTrack
 import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
+import org.dueattendant149.kwhale.BuildConfig
+import org.dueattendant149.kwhale.ui.components.AppUpdateDialog
 import org.dueattendant149.kwhale.ui.components.CoverArt
 import org.dueattendant149.kwhale.ui.components.ErrorState
 import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
@@ -196,6 +198,12 @@ fun KwhaleRoot(
             onPlayerOpened()
         }
     }
+    // In-app updater: silent check at startup; the dialog appears only when a
+    // newer versionCode is published on the server.
+    LaunchedEffect(Unit) {
+        app.updater.checkOnStartup()
+    }
+    AppUpdateDialog(updater = app.updater, currentVersionName = BuildConfig.VERSION_NAME)
 
     val configuration = LocalConfiguration.current
     val useRail = configuration.screenWidthDp >= 600
