@@ -353,6 +353,37 @@ paths:
       responses:
         '204': { description: Дизлайк снят }
 
+  /tracks/{trackId}/censorship:
+    post:
+      tags: [Tracks]
+      operationId: reportCensorship
+      description: Отправить трек на пересмотр цензуры («Отправить на цензуру»). Идемпотентно на (user, track).
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CensorshipReportRequest' }
+      responses:
+        '200':
+          description: Отчёт создан или уже существует
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CensorshipReportResponse' }
+    delete:
+      tags: [Tracks]
+      operationId: cancelCensorshipReport
+      description: Отменить отправку на цензуру
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '204': { description: Отчёт снят }
+
   /albums/{albumId}:
     get:
       tags: [Albums]
@@ -1254,9 +1285,25 @@ components:
         hasLyrics: { type: boolean }
         isDownloaded: { type: boolean }
         downloadStatus: { type: string, enum: [pending, downloading, ready, failed] }
+        isCensorshipReported: { type: boolean, description: Есть открытая жалоба «Отправить на цензуру» }
         previewAvailable: { type: boolean }
         playCount: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
+
+    CensorshipReportRequest:
+      type: object
+      properties:
+        reason: { type: string, default: censored }
+        comment: { type: string }
+        positionMs: { type: integer, format: int64 }
+
+    CensorshipReportResponse:
+      type: object
+      required: [ok, reportId, status]
+      properties:
+        ok: { type: boolean }
+        reportId: { type: string }
+        status: { type: string, enum: [pending, resolved, rejected] }
 
     ArtistSyncStatus:
       type: object
