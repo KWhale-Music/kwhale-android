@@ -18,8 +18,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
@@ -27,9 +29,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.data.ContentCache
@@ -66,6 +72,13 @@ import org.dueattendant149.kwhale.ui.components.TrackRow
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 import org.dueattendant149.kwhale.ui.components.imageUrl
 
+private val trackSortModes = listOf(
+    "default" to "По умолчанию",
+    "added" to "Недавно добавленные",
+    "title" to "По названию",
+    "artist" to "По артисту",
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
@@ -81,6 +94,11 @@ fun LibraryScreen(
     var playlists by remember { mutableStateOf(cached?.playlists.orEmpty()) }
     var albums by remember { mutableStateOf(cached?.albums.orEmpty()) }
     var loading by remember { mutableStateOf(cached == null) }
+    var loadingTracks by remember { mutableStateOf(false) }
+    var loadingMore by remember { mutableStateOf(false) }
+    var nextCursor by remember { mutableStateOf<String?>(null) }
+    var selectedSort by remember { mutableStateOf("default") }
+    var trackQuery by remember { mutableStateOf("") }
     var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
@@ -106,16 +124,14 @@ fun LibraryScreen(
         loading = cached == null && tracks.isEmpty() && playlists.isEmpty() && albums.isEmpty()
         error = null
         runCatching {
-            val tracksPage = app.api.libraryTracks(limit = 100)
             val playlistsPage = app.api.libraryPlaylists(limit = 100)
             val albumsPage = app.api.libraryAlbums(limit = 100)
-            tracks = tracksPage.items
             playlists = playlistsPage.items
             albums = albumsPage.items
             app.cache.write(
                 ContentCache.LIBRARY,
                 LibrarySnapshot.serializer(),
-                LibrarySnapshot(tracksPage.items, playlistsPage.items, albumsPage.items),
+                LibrarySnapshot(tracks, playlistsPage.items, albumsPage.items),
             )
         }.onFailure { err ->
             val msg = err.message ?: "Ошибка сети"
@@ -126,6 +142,54 @@ fun LibraryScreen(
         }
         loading = false
         refreshing = false
+    }
+
+    // Liked tracks: the library shows the COMPLETE list inline (no separate
+    // «Все треки» screen) — first page here, cursor pages on scroll.
+    LaunchedEffect(reload, selectedSort, trackQuery) {
+        if (trackQuery.isNotBlank()) delay(250) // debounce typing
+        loadingTracks = true
+        runCatching {
+            val page = app.api.libraryTracks(
+                limit = 100,
+                sort = selectedSort,
+                query = trackQuery.trim().ifBlank { null },
+            )
+            tracks = page.items
+            nextCursor = page.nextCursor
+            app.cache.write(
+                ContentCache.LIBRARY,
+                LibrarySnapshot.serializer(),
+                LibrarySnapshot(page.items, playlists, albums),
+            )
+        }.onFailure { err ->
+            if (tracks.isEmpty()) error = err.message ?: "Ошибка сети"
+            else snackbar?.showSnackbar("Не удалось обновить список")
+        }
+        loadingTracks = false
+        refreshing = false
+    }
+
+    fun loadMoreTracks() {
+        val cursor = nextCursor ?: return
+        if (loadingMore) return
+        loadingMore = true
+        scope.launch {
+            runCatching {
+                app.api.libraryTracks(
+                    cursor = cursor,
+                    limit = 100,
+                    sort = selectedSort,
+                    query = trackQuery.trim().ifBlank { null },
+                )
+            }.onSuccess { page ->
+                tracks = (tracks + page.items).distinctBy { it.id }
+                nextCursor = page.nextCursor
+            }.onFailure {
+                snackbar?.showSnackbar("Не удалось догрузить треки")
+            }
+            loadingMore = false
+        }
     }
 
     if (loading && tracks.isEmpty() && playlists.isEmpty() && albums.isEmpty()) {
@@ -238,7 +302,7 @@ fun LibraryScreen(
                 }
             }
 
-            if (tracks.isNotEmpty()) {
+            if (tracks.isNotEmpty() || trackQuery.isNotBlank() || selectedSort != "default") {
                 item {
                     Spacer(Modifier.size(16.dp))
                     Button(
@@ -246,16 +310,44 @@ fun LibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
+                        enabled = tracks.isNotEmpty(),
                     ) {
                         Icon(Icons.Rounded.Shuffle, null, Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Перемешать всё")
                     }
-                    SectionHeader(
-                        title = "Любимые треки",
-                        action = "Все",
-                        onAction = { onSeeAll("tracks") },
+                    SectionHeader(title = "Любимые треки")
+                    OutlinedTextField(
+                        value = trackQuery,
+                        onValueChange = { trackQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        placeholder = { Text("Поиск по любимым") },
+                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (trackQuery.isNotBlank()) {
+                                IconButton(onClick = { trackQuery = "" }) {
+                                    Icon(Icons.Rounded.Clear, contentDescription = "Очистить")
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(24.dp),
                     )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(trackSortModes, key = { it.first }) { (sortKey, label) ->
+                            FilterChip(
+                                selected = selectedSort == sortKey,
+                                onClick = { selectedSort = sortKey },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.size(4.dp))
+                }
+                if (loadingTracks) {
+                    item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
                 }
                 itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                     TrackRow(
@@ -271,8 +363,44 @@ fun LibraryScreen(
                             }
                         },
                         onOverflow = { onTrackMenu(track) },
+                        modifier = Modifier.animateItem(),
                     )
                 }
+                if (nextCursor != null) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            OutlinedButton(
+                                onClick = { loadMoreTracks() },
+                                enabled = !loadingMore,
+                            ) {
+                                if (loadingMore) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    Text("Загрузить ещё")
+                                }
+                            }
+                        }
+                    }
+                }
+                if (tracks.isEmpty() && !loadingTracks) {
+                    item {
+                        EmptyState(
+                            title = "Ничего не найдено",
+                            message = "Попробуйте изменить запрос или сортировку",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            } else if (loadingTracks) {
+                items(5) { TrackRowSkeleton() }
             } else {
                 item {
                     EmptyState(

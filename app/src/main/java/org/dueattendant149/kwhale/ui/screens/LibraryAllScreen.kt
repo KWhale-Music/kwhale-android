@@ -12,28 +12,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
@@ -43,7 +35,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -53,29 +44,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
-import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.PlaylistCreate
-import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
 import org.dueattendant149.kwhale.ui.components.EmptyState
 import org.dueattendant149.kwhale.ui.components.ErrorState
-import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
 import org.dueattendant149.kwhale.ui.components.PlaylistCard
 import org.dueattendant149.kwhale.ui.components.ShimmerBox
-import org.dueattendant149.kwhale.ui.components.TrackRow
-
-private val trackSortModes = listOf(
-    "default" to "По умолчанию",
-    "added" to "Недавно добавленные",
-    "title" to "По названию",
-    "artist" to "По артисту",
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,20 +63,14 @@ fun LibraryAllScreen(
     kind: String,
     onBack: () -> Unit,
     onOpenCollection: (String, String) -> Unit,
-    onTrackMenu: (ApiTrack) -> Unit = {},
 ) {
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
-    var tracks by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
-    var nextCursor by remember { mutableStateOf<String?>(null) }
-    var loadingMore by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = albums, 1 = playlists
-    var selectedSort by remember { mutableStateOf("default") }
-    var trackQuery by remember { mutableStateOf("") }
 
     var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
@@ -105,73 +78,32 @@ fun LibraryAllScreen(
     var creating by remember { mutableStateOf(false) }
     var createError by remember { mutableStateOf<String?>(null) }
 
-    val likedOverrides by app.reactions.likedOverrides.collectAsState()
-    val playerState by app.player.state.collectAsState()
-    val currentRemoteId = playerState.current?.remoteId
-    val snackbar = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     val title = when (kind) {
         "collections" -> "Коллекции"
         "playlists" -> "Плейлисты"
-        "tracks", "liked" -> "Любимые треки"
         else -> "Альбомы"
     }
     val canCreatePlaylist = kind == "albums" || kind == "collections" || kind == "playlists"
-    val isTracksMode = kind == "tracks" || kind == "liked"
 
-    LaunchedEffect(kind, reload, selectedSort, trackQuery) {
-        if (isTracksMode && trackQuery.isNotBlank()) {
-            delay(250)
-        }
+    LaunchedEffect(kind, reload) {
         loading = true
         error = null
-        nextCursor = null
         runCatching {
             when (kind) {
                 "playlists" -> playlists = app.api.libraryPlaylists(limit = 100).items
                 "albums" -> albums = app.api.libraryAlbums(limit = 100).items
-                "collections" -> {
+                else -> {
                     playlists = app.api.libraryPlaylists(limit = 100).items
                     albums = app.api.libraryAlbums(limit = 100).items
-                }
-                else -> {
-                    val page = app.api.libraryTracks(
-                        limit = 100,
-                        sort = selectedSort,
-                        query = trackQuery.trim().ifBlank { null },
-                    )
-                    tracks = page.items
-                    nextCursor = page.nextCursor
                 }
             }
         }.onFailure { err ->
             error = err.message ?: "Ошибка загрузки"
         }
         loading = false
-    }
-
-    fun loadMoreTracks() {
-        val cursor = nextCursor ?: return
-        if (loadingMore) return
-        loadingMore = true
-        scope.launch {
-            runCatching {
-                app.api.libraryTracks(
-                    cursor = cursor,
-                    limit = 100,
-                    sort = selectedSort,
-                    query = trackQuery.trim().ifBlank { null },
-                )
-            }.onSuccess { page ->
-                tracks = (tracks + page.items).distinctBy { it.id }
-                nextCursor = page.nextCursor
-            }.onFailure {
-                snackbar?.showSnackbar("Не удалось догрузить треки")
-            }
-            loadingMore = false
-        }
     }
 
     fun createPlaylist() {
@@ -232,40 +164,6 @@ fun LibraryAllScreen(
             }
         }
 
-        if (isTracksMode) {
-            OutlinedTextField(
-                value = trackQuery,
-                onValueChange = { trackQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 6.dp),
-                placeholder = { Text("Поиск по библиотеке") },
-                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (trackQuery.isNotBlank()) {
-                        IconButton(onClick = { trackQuery = "" }) {
-                            Icon(Icons.Rounded.Clear, contentDescription = "Очистить")
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(24.dp),
-            )
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = 6.dp),
-            ) {
-                items(trackSortModes, key = { it.first }) { (sortKey, label) ->
-                    FilterChip(
-                        selected = selectedSort == sortKey,
-                        onClick = { selectedSort = sortKey },
-                        label = { Text(label) },
-                    )
-                }
-            }
-        }
-
         if (loading) {
             LibraryAllSkeleton()
             return@Column
@@ -316,68 +214,11 @@ fun LibraryAllScreen(
                 onOpenCollection = onOpenCollection,
                 modifier = Modifier.weight(1f),
             )
-            else -> {
-                if (tracks.isEmpty()) {
-                    EmptyState(
-                        title = if (trackQuery.isNotBlank()) "Ничего не найдено" else "Пока пусто",
-                        message = if (trackQuery.isNotBlank()) {
-                            "Попробуйте изменить фильтр"
-                        } else {
-                            "Лайкните трек, чтобы он появился здесь"
-                        },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(
-                            start = 20.dp,
-                            end = 20.dp,
-                            bottom = 24.dp + miniPlayerBottom,
-                        ),
-                    ) {
-                        itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
-                            TrackRow(
-                                track = track,
-                                api = app.api,
-                                liked = app.reactions.isLiked(track.id, track.isLiked, likedOverrides),
-                                isCurrent = track.id == currentRemoteId,
-                                onClick = {
-                                    app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
-                                },
-                                onToggleLike = {
-                                    app.cache.invalidateLibrary()
-                                    app.reactions.toggleLike(track, app.api, "library") { msg ->
-                                        scope.launch { snackbar?.showSnackbar(msg) }
-                                    }
-                                },
-                                onOverflow = { onTrackMenu(track) },
-                            )
-                        }
-                        if (nextCursor != null) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 12.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { loadMoreTracks() },
-                                        enabled = !loadingMore,
-                                    ) {
-                                        if (loadingMore) {
-                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                        } else {
-                                            Text("Загрузить ещё")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            else -> EmptyState(
+                title = "Пока пусто",
+                message = "Здесь пока ничего нет",
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
         }
     }
 

@@ -444,7 +444,6 @@ fun KwhaleRoot(
                     kind = entry.arguments?.getString("kind").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onOpenCollection = { kind, id -> navController.navigate("collection/$kind/$id") },
-                    onTrackMenu = { menuTrack = it },
                 )
             }
             composable("collection/{kind}/{id}") { entry ->
