@@ -9,10 +9,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -41,12 +43,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -62,7 +67,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,12 +83,15 @@ import coil.request.ImageRequest
 import org.dueattendant149.kwhale.design.KwhaleCoverPalette
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
+import org.dueattendant149.kwhale.design.rememberReducedMotionEnabled
 import org.dueattendant149.kwhale.network.KwhaleApi
 import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.Artist
 import org.dueattendant149.kwhale.network.model.Banner
 import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
+
+val LocalSnackbarHost = staticCompositionLocalOf<SnackbarHostState?> { null }
 
 fun formatDuration(ms: Long): String {
     val total = (ms / 1000L).toInt().coerceAtLeast(0)
@@ -170,18 +181,24 @@ fun CoverArt(
     seed: String = "",
     showInitial: Boolean = true,
     titleText: String? = null,
+    contentDescription: String? = null,
 ) {
     val dark = isDarkTheme()
     val gradient = remember(seed, dark) { KwhaleCoverPalette.gradient(seed, dark) }
     val onGradient = remember(seed, dark) { KwhaleCoverPalette.onGradient(seed, dark) }
     val initial = remember(seed) { KwhaleCoverPalette.initialOf(seed) }
-    val description = remember(seed) { seed.ifBlank { "Обложка" } }
+
+    val semanticsModifier = if (contentDescription != null) {
+        Modifier.semantics { this.contentDescription = contentDescription }
+    } else {
+        Modifier.clearAndSetSemantics {}
+    }
 
     Box(
         modifier = modifier
             .clip(shape)
             .background(Brush.linearGradient(gradient))
-            .semantics { contentDescription = "Обложка: $description" },
+            .then(semanticsModifier),
         contentAlignment = Alignment.Center,
     ) {
         if (showInitial && !titleText.isNullOrBlank()) {
@@ -273,6 +290,11 @@ fun ShimmerBox(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
 ) {
+    val base = MaterialTheme.colorScheme.surfaceContainerHigh
+    if (rememberReducedMotionEnabled()) {
+        Box(modifier.clip(shape).background(base))
+        return
+    }
     val transition = rememberInfiniteTransition(label = "shimmer")
     val progress by transition.animateFloat(
         initialValue = 0f,
@@ -283,7 +305,6 @@ fun ShimmerBox(
         ),
         label = "shimmerProgress",
     )
-    val base = MaterialTheme.colorScheme.surfaceContainerHigh
     val highlight = MaterialTheme.colorScheme.surfaceContainerHighest
 
     Box(
@@ -401,6 +422,7 @@ fun TrackRow(
                 indication = LocalIndication.current,
                 onClick = onClick,
             )
+            .semantics(mergeDescendants = true) {}
             .padding(vertical = KwhaleSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -444,7 +466,9 @@ fun TrackRow(
                             text = "E",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                .semantics { contentDescription = "Ненормативная лексика" },
                         )
                     }
                 }
@@ -491,12 +515,15 @@ fun LikeIconButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackTile(
     track: ApiTrack,
     api: KwhaleApi,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isCurrent: Boolean = false,
+    onMenu: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Column(
@@ -504,11 +531,22 @@ fun TrackTile(
             .pressScale(interaction)
             .width(132.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(
+            .combinedClickable(
                 interactionSource = interaction,
                 indication = LocalIndication.current,
                 onClick = onClick,
-            ),
+                onLongClick = onMenu,
+            )
+            .semantics(mergeDescendants = true) {
+                if (onMenu != null) {
+                    customActions = listOf(
+                        CustomAccessibilityAction("Меню трека") {
+                            onMenu()
+                            true
+                        },
+                    )
+                }
+            },
     ) {
         CoverArt(
             imageUrl = track.imageUrl(api),
@@ -523,7 +561,7 @@ fun TrackTile(
         Text(
             text = track.title,
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -795,6 +833,8 @@ fun EmptyState(
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.MusicNote,
+    secondaryAction: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -836,6 +876,12 @@ fun EmptyState(
                 Text(action)
             }
         }
+        if (secondaryAction != null && onSecondaryAction != null) {
+            Spacer(Modifier.height(KwhaleSpacing.xs))
+            OutlinedButton(onClick = onSecondaryAction) {
+                Text(secondaryAction)
+            }
+        }
     }
 }
 
@@ -844,6 +890,8 @@ fun ErrorState(
     message: String,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    secondaryAction: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     EmptyState(
         title = "Не удалось загрузить",
@@ -852,6 +900,8 @@ fun ErrorState(
         onAction = onRetry,
         modifier = modifier,
         icon = Icons.Rounded.MusicNote,
+        secondaryAction = secondaryAction,
+        onSecondaryAction = onSecondaryAction,
     )
 }
 

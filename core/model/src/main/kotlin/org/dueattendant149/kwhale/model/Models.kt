@@ -24,6 +24,7 @@ data class Track(
     val isLiked: Boolean = false,
     val isDisliked: Boolean = false,
     val isOfflineCached: Boolean = false,
+    val isCensorshipReported: Boolean = false,
 )
 
 @Serializable

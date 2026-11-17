@@ -14,7 +14,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.dueattendant149.kwhale.analytics.EventTracker
+import org.dueattendant149.kwhale.data.ApiReactionGateway
 import org.dueattendant149.kwhale.data.ContentCache
+import org.dueattendant149.kwhale.data.TrackReactionStore
+import org.dueattendant149.kwhale.download.DownloadObserver
 import org.dueattendant149.kwhale.download.DownloadStore
 import org.dueattendant149.kwhale.network.ApiConfig
 import org.dueattendant149.kwhale.network.ApiFactory
@@ -34,6 +37,12 @@ class KwhaleApp : Application() {
         private set
 
     lateinit var downloads: DownloadStore
+        private set
+
+    lateinit var downloadObserver: DownloadObserver
+        private set
+
+    lateinit var reactions: TrackReactionStore
         private set
 
     lateinit var events: EventTracker
@@ -58,6 +67,12 @@ class KwhaleApp : Application() {
         widgetSnapshot = PlayerSnapshotStore(this)
         initApiAndEvents(settings.apiBaseUrl)
         player = Media3Player(this, appScope, downloads, events)
+        downloadObserver = DownloadObserver(this, downloads, appScope)
+        reactions = TrackReactionStore(
+            gateway = ApiReactionGateway(apiProvider = { api }, eventsProvider = { events }),
+            scope = appScope,
+            onPlayerTrackLiked = { id, liked -> player.updateTrackLiked(id, liked) },
+        )
 
         appScope.launch {
             player.state

@@ -28,7 +28,7 @@ class DownloadWorker(
         val durationSec = inputData.getInt(KEY_DURATION_SEC, 0)
 
         val app = applicationContext as KwhaleApp
-        val store = DownloadStore(applicationContext)
+        val store = app.downloads
         val safeId = remoteId.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val dir = store.downloadsDir(applicationContext)
         val destination = File(dir, "$safeId.mp3")

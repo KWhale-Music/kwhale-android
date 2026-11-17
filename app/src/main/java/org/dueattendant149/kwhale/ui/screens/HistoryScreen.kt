@@ -10,31 +10,36 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
-import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.EmptyState
+import org.dueattendant149.kwhale.ui.components.ErrorState
+import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
 import org.dueattendant149.kwhale.ui.components.SectionHeader
 import org.dueattendant149.kwhale.ui.components.TrackRow
 
@@ -50,14 +55,27 @@ fun HistoryScreen(
     var nextCursor by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var loadingMore by remember { mutableStateOf(false) }
-    val liked = remember { mutableStateMapOf<String, Boolean>() }
+    var clearing by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var reloadKey by remember { mutableStateOf(0) }
+    val likedOverrides by app.reactions.likedOverrides.collectAsState()
+    val playerState by app.player.state.collectAsState()
+    val snackbarHost = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
-    LaunchedEffect(Unit) {
-        val page = runCatching { app.api.history(limit = 50) }.getOrNull()
-        tracks = page?.items?.map { it.track } ?: emptyList()
-        nextCursor = page?.nextCursor
+    LaunchedEffect(reloadKey) {
+        loading = true
+        error = null
+        runCatching { app.api.history(limit = 50) }
+            .onSuccess { page ->
+                tracks = page.items.map { it.track }
+                nextCursor = page.nextCursor
+            }
+            .onFailure { err ->
+                error = err.message ?: "Не удалось загрузить историю"
+            }
         loading = false
     }
 
@@ -69,6 +87,16 @@ fun HistoryScreen(
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
                 }
             },
+            actions = {
+                if (tracks.isNotEmpty()) {
+                    IconButton(
+                        enabled = !clearing,
+                        onClick = { confirmClear = true },
+                    ) {
+                        Icon(Icons.Rounded.DeleteSweep, contentDescription = "Очистить историю")
+                    }
+                }
+            },
         )
         if (loading) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -76,10 +104,19 @@ fun HistoryScreen(
             }
             return@Column
         }
+        if (error != null && tracks.isEmpty()) {
+            ErrorState(
+                message = error ?: "Ошибка сети",
+                onRetry = { reloadKey++ },
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
+            return@Column
+        }
         if (tracks.isEmpty()) {
             EmptyState(
                 title = "История пуста",
                 message = "Здесь появятся прослушанные треки",
+                icon = Icons.Rounded.History,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
             return@Column
@@ -89,22 +126,23 @@ fun HistoryScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + miniPlayerBottom),
         ) {
             item { SectionHeader("Недавнее") }
-            itemsIndexed(tracks) { index, track ->
+            itemsIndexed(tracks, key = { index, track -> "${track.id}:$index" }) { index, track ->
+                val isLiked = app.reactions.isLiked(track.id, track.isLiked, likedOverrides)
                 TrackRow(
                     track = track,
                     api = app.api,
-                    liked = liked[track.id] ?: track.isLiked,
+                    liked = isLiked,
+                    isCurrent = playerState.current?.remoteId == track.id,
                     onClick = {
                         onPlay(tracks.map { it.toUi(app.api) }, index)
                     },
                     onToggleLike = {
-                        val next = liked[track.id] ?: !track.isLiked
-                        liked[track.id] = next
-                        scope.launch {
-                            runCatching {
-                                if (next) app.api.like(track.id) else app.api.unlike(track.id)
-                            }
-                        }
+                        app.reactions.toggleLike(
+                            track = track,
+                            api = app.api,
+                            surface = "history",
+                            onError = { msg -> scope.launch { snackbarHost?.showSnackbar(msg) } },
+                        )
                     },
                     onOverflow = { onTrackMenu(track) },
                 )
@@ -125,6 +163,9 @@ fun HistoryScreen(
                                                 tracks = tracks + page.items.map { it.track }
                                                 nextCursor = page.nextCursor
                                             }
+                                            .onFailure {
+                                                snackbarHost?.showSnackbar("Не удалось загрузить ещё")
+                                            }
                                         loadingMore = false
                                     }
                                 }
@@ -136,5 +177,40 @@ fun HistoryScreen(
                 }
             }
         }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { if (!clearing) confirmClear = false },
+            title = { Text("Очистить историю?") },
+            text = { Text("Список недавно прослушанных треков будет очищен.") },
+            confirmButton = {
+                TextButton(
+                    enabled = !clearing,
+                    onClick = {
+                        clearing = true
+                        scope.launch {
+                            runCatching { app.api.clearHistory() }
+                                .onSuccess {
+                                    tracks = emptyList()
+                                    nextCursor = null
+                                    confirmClear = false
+                                    snackbarHost?.showSnackbar("История очищена")
+                                }
+                                .onFailure { err ->
+                                    snackbarHost?.showSnackbar(err.message ?: "Не удалось очистить историю")
+                                }
+                            clearing = false
+                        }
+                    },
+                ) { Text("Очистить") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !clearing,
+                    onClick = { confirmClear = false },
+                ) { Text("Отмена") }
+            },
+        )
     }
 }

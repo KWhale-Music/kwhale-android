@@ -18,21 +18,22 @@ class SettingsStore(context: Context) {
         set(value) { prefs.edit().putBoolean("logged_in", value).apply() }
 
     var themeMode: ThemeMode
-        get() = runCatching {
-            ThemeMode.valueOf(prefs.getString("theme_mode", ThemeMode.DARK.name)!!)
-        }.getOrDefault(ThemeMode.DARK)
+        get() {
+            val raw = prefs.getString("theme_mode", ThemeMode.DARK.name).orEmpty()
+            return if (raw == "MONET") ThemeMode.SYSTEM
+            else runCatching { ThemeMode.valueOf(raw) }.getOrDefault(ThemeMode.DARK)
+        }
         set(value) { prefs.edit().putString("theme_mode", value.name).apply() }
-
-    var themeId: Int
-        get() = prefs.getInt("theme_id", 0)
-        set(value) { prefs.edit().putInt("theme_id", value).apply() }
 
     var accentId: Int
         get() = prefs.getInt("accent_id", 2)
         set(value) { prefs.edit().putInt("accent_id", value).apply() }
 
     var monet: Boolean
-        get() = prefs.getBoolean("monet", false)
+        get() = prefs.getBoolean(
+            "monet",
+            prefs.getString("theme_mode", "") == "MONET",
+        )
         set(value) { prefs.edit().putBoolean("monet", value).apply() }
 
     var onboardingDone: Boolean

@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
                 SideEffect {
                     val window = (view.context as Activity).window
                     val lightBars = themeMode == ThemeMode.LIGHT ||
-                        (themeMode == ThemeMode.MONET && !systemDark)
+                        (themeMode == ThemeMode.SYSTEM && !systemDark)
                     WindowCompat.getInsetsController(window, view).apply {
                         isAppearanceLightStatusBars = lightBars
                         isAppearanceLightNavigationBars = lightBars

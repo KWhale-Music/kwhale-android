@@ -1,7 +1,6 @@
 package org.dueattendant149.kwhale.ui.screens
 
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -12,38 +11,41 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedButton
-import org.dueattendant149.kwhale.network.model.EnrichmentProposal
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material.icons.rounded.History
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,12 +60,15 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.dueattendant149.kwhale.BuildConfig
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.data.ContentCache
 import org.dueattendant149.kwhale.data.ProfileSnapshot
+import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
-import org.dueattendant149.kwhale.download.DownloadStore
+import org.dueattendant149.kwhale.network.model.EnrichmentProposal
 import org.dueattendant149.kwhale.ui.components.CoverArt
+import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
 import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import java.io.File
 
@@ -78,6 +83,7 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHost = LocalSnackbarHost.current
     val cached = remember { app.cache.read(ContentCache.PROFILE, ProfileSnapshot.serializer()) }
     var name by remember {
         mutableStateOf(cached?.name ?: app.api.session()?.user?.displayName ?: "Профиль")
@@ -85,37 +91,50 @@ fun ProfileScreen(
     var email by remember { mutableStateOf(cached?.email ?: app.api.session()?.user?.email ?: "") }
     var avatar by remember { mutableStateOf(cached?.avatar) }
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
+    val downloadedTracks by app.downloadObserver.downloadedTracks.collectAsState()
+    val downloadCount = downloadedTracks.count { it.file().exists() }
     var trackCount by remember { mutableStateOf(cached?.trackCount ?: 0) }
     var playlistCount by remember { mutableStateOf(cached?.playlistCount ?: 0) }
-    var downloadCount by remember { mutableStateOf(cached?.downloadCount ?: 0) }
     var enrichments by remember { mutableStateOf(cached?.enrichments.orEmpty()) }
     var loading by remember { mutableStateOf(cached == null) }
+    var uploading by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
+    var confirmLogout by remember { mutableStateOf(false) }
+    var reloadKey by remember { mutableStateOf(0) }
 
     val uploadLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
+        if (uri == null || uploading) return@rememberLauncherForActivityResult
+        uploading = true
         scope.launch {
             runCatching {
                 val display = uri.lastPathSegment?.substringAfterLast('/') ?: "upload.mp3"
                 val ext = display.substringAfterLast('.', "mp3")
                 val temp = File(context.cacheDir, "upload_${System.currentTimeMillis()}.$ext")
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        temp.outputStream().use { output -> input.copyTo(output) }
-                    } ?: error("Не удалось прочитать файл")
+                try {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            temp.outputStream().use { output -> input.copyTo(output) }
+                        } ?: error("Не удалось прочитать файл")
+                    }
+                    app.api.uploadTrack(temp, title = display.substringBeforeLast('.'))
+                } finally {
+                    temp.delete()
                 }
-                val uploaded = app.api.uploadTrack(temp, title = display.substringBeforeLast('.'))
-                temp.delete()
-                uploaded
             }.onSuccess {
-                Toast.makeText(context, "Трек загружен", Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(context, "Ошибка загрузки: ${it.message}", Toast.LENGTH_LONG).show()
+                app.cache.invalidateLibrary()
+                app.cache.invalidateProfile()
+                trackCount += 1
+                reloadKey += 1
+                snackbarHost?.showSnackbar("Трек загружен в библиотеку")
+            }.onFailure { err ->
+                snackbarHost?.showSnackbar("Ошибка загрузки: ${err.message ?: "неизвестная ошибка"}")
             }
+            uploading = false
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (cached != null && app.cache.isFresh(ContentCache.PROFILE, 60_000)) {
+    LaunchedEffect(reloadKey) {
+        if (reloadKey == 0 && cached != null && app.cache.isFresh(ContentCache.PROFILE, 60_000)) {
             loading = false
             return@LaunchedEffect
         }
@@ -124,10 +143,9 @@ fun ProfileScreen(
             email = me.email.orEmpty()
             avatar = me.avatar?.let { app.api.imageUrl(it.id) }
         }
-        trackCount = runCatching { app.api.libraryTracks(limit = 1).total }.getOrNull() ?: 0
-        playlistCount = runCatching { app.api.libraryPlaylists(limit = 1).total }.getOrNull() ?: 0
-        downloadCount = DownloadStore(context).all().count { it.file().exists() }
-        enrichments = runCatching { app.api.enrichments().items }.getOrDefault(emptyList())
+        trackCount = runCatching { app.api.libraryTracks(limit = 1).total }.getOrNull() ?: trackCount
+        playlistCount = runCatching { app.api.libraryPlaylists(limit = 1).total }.getOrNull() ?: playlistCount
+        enrichments = runCatching { app.api.enrichments().items }.getOrDefault(enrichments)
         app.cache.write(
             ContentCache.PROFILE,
             ProfileSnapshot.serializer(),
@@ -152,15 +170,15 @@ fun ProfileScreen(
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
             top = 24.dp,
             bottom = 28.dp + miniPlayerBottom,
         ),
     ) {
         item {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(Modifier.size(88.dp)) {
@@ -169,6 +187,7 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxSize(),
                         shape = CircleShape,
                         iconSize = 34,
+                        seed = name,
                     )
                 }
                 Spacer(Modifier.height(12.dp))
@@ -191,12 +210,15 @@ fun ProfileScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 20.dp),
+                    .padding(horizontal = 20.dp, vertical = 20.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                Stat("$trackCount", "в библиотеке")
-                Stat("$playlistCount", "плейлистов")
-                Stat("$downloadCount", "скачано")
+                Stat(KwhalePlural.formatted(trackCount), "в библиотеке")
+                Stat(
+                    KwhalePlural.formatted(playlistCount),
+                    KwhalePlural.playlists(playlistCount).substringAfter(' '),
+                )
+                Stat(KwhalePlural.formatted(downloadCount), "скачано")
             }
         }
         if (enrichments.isNotEmpty()) {
@@ -217,6 +239,11 @@ fun ProfileScreen(
                                 .onSuccess {
                                     enrichments = enrichments.filterNot { it.id == prop.id }
                                     app.cache.invalidateProfile()
+                                    app.cache.invalidateLibrary()
+                                    snackbarHost?.showSnackbar("Метаданные подтверждены")
+                                }
+                                .onFailure {
+                                    snackbarHost?.showSnackbar("Не удалось подтвердить изменения")
                                 }
                         }
                     },
@@ -227,12 +254,15 @@ fun ProfileScreen(
                                     enrichments = enrichments.filterNot { it.id == prop.id }
                                     app.cache.invalidateProfile()
                                 }
+                                .onFailure {
+                                    snackbarHost?.showSnackbar("Не удалось отклонить предложение")
+                                }
                         }
                     },
                 )
             }
         }
-        item { HorizontalDivider() }
+        item { HorizontalDivider(Modifier.padding(horizontal = 20.dp)) }
         item {
             ProfileRow("История", Icons.Rounded.History, onHistory)
         }
@@ -240,11 +270,26 @@ fun ProfileScreen(
             ProfileRow("Скачано", Icons.Rounded.CloudDownload, onDownloads)
         }
         item {
-            ProfileRow("Загрузить трек", Icons.Rounded.Upload, onClick = {
-                uploadLauncher.launch(arrayOf("audio/*"))
-            })
+            Column {
+                ProfileRow(
+                    title = if (uploading) "Загружаем трек…" else "Загрузить трек",
+                    icon = Icons.Rounded.Upload,
+                    onClick = {
+                        if (!uploading) uploadLauncher.launch(arrayOf("audio/*"))
+                    },
+                    enabled = !uploading,
+                    loading = uploading,
+                )
+                if (uploading) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 2.dp),
+                    )
+                }
+            }
         }
-        item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+        item { HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) }
         item {
             ProfileRow("Оформление", Icons.Rounded.Palette, onAppearance)
         }
@@ -252,14 +297,54 @@ fun ProfileScreen(
             ProfileRow("Настройки", Icons.Rounded.Settings, onSettings)
         }
         item {
-            ProfileRow("О приложении", Icons.Rounded.Info, onClick = {
-                Toast.makeText(context, "KWhale · KWhale music", Toast.LENGTH_SHORT).show()
-            })
+            ProfileRow("О приложении", Icons.Rounded.Info, onClick = { showAbout = true })
         }
-        item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+        item { HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) }
         item {
-            ProfileRow("Выйти", Icons.AutoMirrored.Rounded.Logout, onLogout, destructive = true)
+            ProfileRow(
+                title = "Выйти",
+                icon = Icons.AutoMirrored.Rounded.Logout,
+                onClick = { confirmLogout = true },
+                destructive = true,
+            )
         }
+    }
+
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            title = { Text("KWhale") },
+            text = {
+                Text(
+                    "Версия ${BuildConfig.VERSION_NAME} (сборка ${BuildConfig.VERSION_CODE})\n" +
+                        "Сервер: ${app.settings.apiBaseUrl}",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showAbout = false }) { Text("Закрыть") }
+            },
+        )
+    }
+
+    if (confirmLogout) {
+        AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text("Выйти из аккаунта?") },
+            text = { Text("Вы сможете снова войти по email или выбрать другой сервер.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmLogout = false
+                        onLogout()
+                    },
+                ) {
+                    Text("Выйти", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = false }) { Text("Отмена") }
+            },
+        )
     }
 }
 
@@ -281,27 +366,46 @@ private fun ProfileRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
     destructive: Boolean = false,
+    enabled: Boolean = true,
+    loading: Boolean = false,
 ) {
     ListItem(
         headlineContent = {
             Text(
                 title,
-                color = if (destructive) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.onSurface,
+                color = when {
+                    !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                    destructive -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
             )
         },
         leadingContent = {
             Icon(
                 icon,
                 contentDescription = null,
-                tint = if (destructive) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = when {
+                    !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                    destructive -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
+        },
+        trailingContent = if (loading) {
+            {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
+        } else {
+            null
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 4.dp),
     )
 }
 

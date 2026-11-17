@@ -23,7 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-enum class ThemeMode { DARK, LIGHT, AMOLED, MONET }
+enum class ThemeMode { SYSTEM, DARK, LIGHT, AMOLED }
 
 data class KwhaleAccent(val id: Int, val name: String, val argb: Long) {
     val color: Color get() = Color((0xFF000000L or argb).toInt())
@@ -191,18 +191,34 @@ fun KwhaleTheme(
     mode: ThemeMode,
     accent: KwhaleAccent,
     monet: Boolean,
-    themeId: Int = -1,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val systemDark = isSystemInDarkTheme()
+    val useDark = when (mode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
+        ThemeMode.SYSTEM -> systemDark
+    }
     val scheme = when {
-        mode == ThemeMode.MONET && monet && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (systemDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        mode == ThemeMode.MONET && systemDark -> darkScheme(accent.color, amoled = false)
-        mode == ThemeMode.MONET -> lightScheme(accent.color)
-        mode == ThemeMode.DARK -> darkScheme(accent.color, amoled = false)
-        mode == ThemeMode.AMOLED -> darkScheme(accent.color, amoled = true)
+        monet && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val dynamic = if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (mode == ThemeMode.AMOLED) {
+                dynamic.copy(
+                    background = Color.Black,
+                    surface = Color.Black,
+                    surfaceDim = Color.Black,
+                    surfaceContainerLowest = Color.Black,
+                    surfaceContainerLow = Color(0xFF080808),
+                    surfaceContainer = Color(0xFF0E0E0E),
+                    surfaceContainerHigh = Color(0xFF161616),
+                    surfaceContainerHighest = Color(0xFF1E1E1E),
+                )
+            } else {
+                dynamic
+            }
+        }
+        useDark -> darkScheme(accent.color, amoled = mode == ThemeMode.AMOLED)
         else -> lightScheme(accent.color)
     }
 

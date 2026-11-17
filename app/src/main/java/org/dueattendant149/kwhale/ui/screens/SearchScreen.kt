@@ -8,11 +8,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,18 +24,19 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,21 +53,33 @@ import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.data.ContentCache
 import org.dueattendant149.kwhale.data.SearchBootstrapSnapshot
+import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
-import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.network.model.SearchResponse
 import org.dueattendant149.kwhale.network.model.SearchTop
+import org.dueattendant149.kwhale.network.model.Suggestion
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
 import org.dueattendant149.kwhale.ui.components.ArtistCard
 import org.dueattendant149.kwhale.ui.components.CoverArt
+import org.dueattendant149.kwhale.ui.components.EmptyState
+import org.dueattendant149.kwhale.ui.components.ErrorState
+import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
 import org.dueattendant149.kwhale.ui.components.PlaylistCard
 import org.dueattendant149.kwhale.ui.components.SectionHeader
 import org.dueattendant149.kwhale.ui.components.TrackRow
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.components.imageUrl
+
+private val searchTypes = listOf(
+    "all" to "Всё",
+    "tracks" to "Треки",
+    "albums" to "Альбомы",
+    "artists" to "Артисты",
+    "playlists" to "Плейлисты",
+)
 
 @Composable
 fun SearchScreen(
@@ -76,14 +89,21 @@ fun SearchScreen(
 ) {
     val cached = remember { app.cache.read(ContentCache.SEARCH_BOOTSTRAP, SearchBootstrapSnapshot.serializer()) }
     var query by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf("all") }
     var results by remember { mutableStateOf<SearchResponse?>(null) }
+    var suggestions by remember { mutableStateOf<List<Suggestion>>(emptyList()) }
     var history by remember { mutableStateOf(cached?.history.orEmpty()) }
     var genres by remember { mutableStateOf(cached?.genres.orEmpty()) }
     var topArtists by remember { mutableStateOf(cached?.artists.orEmpty()) }
     var loading by remember { mutableStateOf(false) }
+    var refiningSlowResults by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var searchTick by remember { mutableStateOf(0) }
-    val liked = remember { mutableStateMapOf<String, Boolean>() }
+    var searchTick by remember { mutableIntStateOf(0) }
+
+    val likedOverrides by app.reactions.likedOverrides.collectAsState()
+    val playerState by app.player.state.collectAsState()
+    val currentRemoteId = playerState.current?.remoteId
+    val snackbar = LocalSnackbarHost.current
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
@@ -103,38 +123,54 @@ fun SearchScreen(
         )
     }
 
-    LaunchedEffect(query, searchTick) {
+    LaunchedEffect(query) {
+        val trimmed = query.trim()
+        if (trimmed.length < 2) {
+            suggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(180)
+        suggestions = runCatching { app.api.suggestions(trimmed).items }
+            .getOrDefault(emptyList())
+            .filter { !it.text.equals(trimmed, ignoreCase = true) }
+    }
+
+    LaunchedEffect(query, selectedType, searchTick) {
         if (query.isBlank()) {
             results = null
             error = null
             loading = false
+            refiningSlowResults = false
             return@LaunchedEffect
         }
-        delay(350)
+        delay(300)
         loading = true
+        refiningSlowResults = false
         error = null
+        val trimmed = query.trim()
         try {
-            // Two-wave search: show what the fast sources returned right away,
-            // then ask the server to wait for the slow ones. Previously the
-            // client never followed up, so a partial (often local-only) first
-            // wave stayed on screen forever.
-            val quick = app.api.search(query.trim(), limit = 30, wait = false)
+            // Two-wave search: show fast local hits right away, then wait for external sources.
+            val quick = app.api.search(trimmed, type = selectedType, limit = 30, wait = false)
             results = quick
             app.cache.invalidateSearchBootstrap()
             loading = false
             if (quick.partial) {
+                refiningSlowResults = true
                 try {
-                    results = app.api.search(query.trim(), limit = 30, wait = true)
+                    results = app.api.search(trimmed, type = selectedType, limit = 30, wait = true)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
-                    // Keep the quick result rather than replacing it with an error.
+                    // Keep quick partial results rather than throwing away what arrived.
+                } finally {
+                    refiningSlowResults = false
                 }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             results = null
+            refiningSlowResults = false
             error = "Не удалось выполнить поиск: ${e.message ?: "сеть"}"
             loading = false
         }
@@ -151,7 +187,7 @@ fun SearchScreen(
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
             trailingIcon = {
                 if (query.isNotBlank()) {
-                    IconButton(onClick = { query = "" }) {
+                    IconButton(onClick = { query = ""; suggestions = emptyList() }) {
                         Icon(Icons.Rounded.Clear, contentDescription = "Очистить")
                     }
                 }
@@ -162,18 +198,80 @@ fun SearchScreen(
             keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
         )
 
+        if (query.isNotBlank()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 8.dp),
+            ) {
+                items(searchTypes, key = { it.first }) { (typeKey, label) ->
+                    FilterChip(
+                        selected = selectedType == typeKey,
+                        onClick = { selectedType = typeKey },
+                        label = { Text(label) },
+                    )
+                }
+            }
+            if (suggestions.isNotEmpty()) {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                ) {
+                    items(suggestions.take(8), key = { "${it.type}-${it.text}" }) { suggestion ->
+                        FilterChip(
+                            selected = false,
+                            onClick = {
+                                query = suggestion.text
+                                focusManager.clearFocus()
+                            },
+                            label = { Text(suggestion.text, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        )
+                    }
+                }
+            }
+            if (refiningSlowResults) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .height(2.dp),
+                )
+            }
+        }
+
         if (query.isBlank()) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp + miniPlayerBottom),
             ) {
                 if (history.isNotEmpty()) {
-                    item { SectionHeader("Недавние запросы") }
+                    item {
+                        SectionHeader(
+                            title = "Недавние запросы",
+                            action = "Очистить",
+                            onAction = {
+                                scope.launch {
+                                    runCatching { app.api.clearSearchHistory() }
+                                        .onSuccess {
+                                            history = emptyList()
+                                            app.cache.invalidateSearchBootstrap()
+                                        }
+                                        .onFailure {
+                                            snackbar?.showSnackbar("Не удалось очистить историю поиска")
+                                        }
+                                }
+                            },
+                        )
+                    }
                     items(history.take(6)) { q ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { query = q }
+                                .clickable {
+                                    query = q
+                                    focusManager.clearFocus()
+                                }
                                 .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -195,7 +293,10 @@ fun SearchScreen(
                             items(genres.take(12)) { genre ->
                                 FilterChip(
                                     selected = false,
-                                    onClick = { query = genre.name },
+                                    onClick = {
+                                        query = genre.name
+                                        focusManager.clearFocus()
+                                    },
                                     label = { Text(genre.name) },
                                 )
                             }
@@ -230,108 +331,104 @@ fun SearchScreen(
             } else {
                 val data = results
                 val err = error
-                if (err != null) {
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = err,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Button(onClick = { searchTick++ }) {
-                                Text("Повторить")
-                            }
-                        }
-                    }
-                } else if (data == null || (data.tracks.isEmpty() && data.albums.isEmpty() && data.artists.isEmpty() && data.playlists.isEmpty())) {
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Ничего не найдено",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                val noHits = data == null || (data.tracks.isEmpty() && data.albums.isEmpty() && data.artists.isEmpty() && data.playlists.isEmpty())
+                when {
+                    err != null -> {
+                        ErrorState(
+                            message = err,
+                            onRetry = { searchTick++ },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
                         )
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp + miniPlayerBottom),
-                    ) {
-                        item { TopResult(data.top, app, onOpenCollection) }
-                        val top = data.top
-                        val tracks = data.tracks.filterNot {
-                            top?.type == "track" && it.id == top.track?.id
-                        }
-                        val albums = data.albums.filterNot {
-                            top?.type == "album" && it.id == top.album?.id
-                        }
-                        val artists = data.artists.filterNot {
-                            top?.type == "artist" && it.id == top.artist?.id
-                        }
-                        val playlists = data.playlists.filterNot {
-                            top?.type == "playlist" && it.id == top.playlist?.id
-                        }
-                        if (tracks.isNotEmpty()) {
-                            item { SectionHeader("Треки") }
-                            itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                                TrackRow(
-                                    track = track,
-                                    api = app.api,
-                                                    liked = liked[track.id] ?: track.isLiked,
-                                    onClick = {
-                                        app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
-                                    },
-                                    onToggleLike = {
-                                        val next = liked[track.id] ?: !track.isLiked
-                                        liked[track.id] = next
-                                        scope.launch {
-                                            runCatching {
-                                                if (next) app.api.like(track.id) else app.api.unlike(track.id)
+                    noHits -> {
+                        EmptyState(
+                            title = "Ничего не найдено",
+                            message = "Попробуйте изменить запрос или выбрать категорию «Всё»",
+                            icon = Icons.Rounded.Search,
+                            action = if (selectedType != "all") "Показать все категории" else null,
+                            onAction = if (selectedType != "all") ({ selectedType = "all" }) else null,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp + miniPlayerBottom),
+                        ) {
+                            item { TopResult(data!!.top, app, onOpenCollection) }
+                            val top = data!!.top
+                            val tracks = data.tracks.filterNot {
+                                top?.type == "track" && it.id == top.track?.id
+                            }
+                            val albums = data.albums.filterNot {
+                                top?.type == "album" && it.id == top.album?.id
+                            }
+                            val artists = data.artists.filterNot {
+                                top?.type == "artist" && it.id == top.artist?.id
+                            }
+                            val playlists = data.playlists.filterNot {
+                                top?.type == "playlist" && it.id == top.playlist?.id
+                            }
+                            if (tracks.isNotEmpty()) {
+                                item { SectionHeader("Треки") }
+                                itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                                    TrackRow(
+                                        track = track,
+                                        api = app.api,
+                                        liked = app.reactions.isLiked(track.id, track.isLiked, likedOverrides),
+                                        isCurrent = track.id == currentRemoteId,
+                                        onClick = {
+                                            focusManager.clearFocus()
+                                            app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
+                                        },
+                                        onToggleLike = {
+                                            app.reactions.toggleLike(track, app.api, "search") { msg ->
+                                                scope.launch { snackbar?.showSnackbar(msg) }
                                             }
+                                        },
+                                        onOverflow = { onTrackMenu(track) },
+                                    )
+                                }
+                            }
+                            if (albums.isNotEmpty()) {
+                                item { SectionHeader("Альбомы") }
+                                item {
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        items(albums) { album ->
+                                            AlbumCard(
+                                                album = album,
+                                                api = app.api,
+                                                onClick = { onOpenCollection("album", album.id) },
+                                            )
                                         }
-                                    },
-                                    onOverflow = { onTrackMenu(track) },
-                                )
-                            }
-                        }
-                        if (albums.isNotEmpty()) {
-                            item { SectionHeader("Альбомы") }
-                            item {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(albums) { album ->
-                                        AlbumCard(
-                                            album = album,
-                                            api = app.api,
-                                            onClick = { onOpenCollection("album", album.id) },
-                                        )
                                     }
                                 }
                             }
-                        }
-                        if (playlists.isNotEmpty()) {
-                            item { SectionHeader("Плейлисты") }
-                            item {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(playlists) { playlist ->
-                                        PlaylistCard(
-                                            playlist = playlist,
-                                            api = app.api,
-                                            onClick = { onOpenCollection("playlist", playlist.id) },
-                                        )
+                            if (playlists.isNotEmpty()) {
+                                item { SectionHeader("Плейлисты") }
+                                item {
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        items(playlists) { playlist ->
+                                            PlaylistCard(
+                                                playlist = playlist,
+                                                api = app.api,
+                                                onClick = { onOpenCollection("playlist", playlist.id) },
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        if (artists.isNotEmpty()) {
-                            item { SectionHeader("Артисты") }
-                            item {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(artists) { artist ->
-                                        ArtistCard(
-                                            artist = artist,
-                                            api = app.api,
-                                            onClick = { onOpenCollection("artist", artist.id) },
-                                        )
+                            if (artists.isNotEmpty()) {
+                                item { SectionHeader("Артисты") }
+                                item {
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        items(artists) { artist ->
+                                            ArtistCard(
+                                                artist = artist,
+                                                api = app.api,
+                                                onClick = { onOpenCollection("artist", artist.id) },
+                                            )
+                                        }
                                     }
                                 }
                             }

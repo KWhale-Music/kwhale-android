@@ -312,4 +312,41 @@ class KwhaleApiTest {
         val updatedUser = api.updateMe("New Name")
         assertEquals("New Name", updatedUser.displayName)
     }
+
+    @Test
+    fun reportsAndCancelsCensorshipReview() = runBlocking {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(202)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"ok":true,"reportId":"rep_42","status":"pending"}"""),
+        )
+        server.enqueue(MockResponse().setResponseCode(204))
+
+        val session = Session(
+            accessToken = "access",
+            refreshToken = "refresh",
+            expiresAtEpochSec = Long.MAX_VALUE,
+            user = User(id = "user_1", displayName = "Demo"),
+        )
+        val api = ApiFactory.createInMemory(config(), session)
+
+        val response = api.reportCensorship("track_99", reason = "censored", positionMs = 42_000L)
+        assertTrue(response.ok)
+        assertEquals("rep_42", response.reportId)
+        assertEquals("pending", response.status)
+
+        val postRequest = server.takeRequest()
+        assertEquals("POST", postRequest.method)
+        assertTrue(postRequest.path.orEmpty().endsWith("/tracks/track_99/censorship"))
+        assertTrue(!postRequest.getHeader("Idempotency-Key").isNullOrBlank())
+        val reqBody = postRequest.body.readUtf8()
+        assertTrue(reqBody.contains("\"reason\":\"censored\""))
+        assertTrue(reqBody.contains("\"positionMs\":42000"))
+
+        api.cancelCensorshipReport("track_99")
+        val deleteRequest = server.takeRequest()
+        assertEquals("DELETE", deleteRequest.method)
+        assertTrue(deleteRequest.path.orEmpty().endsWith("/tracks/track_99/censorship"))
+    }
 }

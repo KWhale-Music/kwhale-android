@@ -40,6 +40,7 @@ internal fun ApiTrack.toUi(api: KwhaleApi, isOfflineCached: Boolean = false): Tr
     isLiked = isLiked,
     isDisliked = isDisliked,
     isOfflineCached = isOfflineCached,
+    isCensorshipReported = isCensorshipReported,
 )
 
 internal fun ApiAlbum.toUi(api: KwhaleApi): Album = Album(

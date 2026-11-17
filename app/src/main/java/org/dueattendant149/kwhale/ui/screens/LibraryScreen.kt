@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -19,18 +19,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,22 +50,23 @@ import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.data.ContentCache
 import org.dueattendant149.kwhale.data.LibrarySnapshot
+import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
-import org.dueattendant149.kwhale.data.toUi
-import org.dueattendant149.kwhale.network.model.Album
-import org.dueattendant149.kwhale.network.model.Playlist
+import org.dueattendant149.kwhale.network.model.PlaylistCreate
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
 import org.dueattendant149.kwhale.ui.components.CardCarouselSkeleton
 import org.dueattendant149.kwhale.ui.components.EmptyState
 import org.dueattendant149.kwhale.ui.components.ErrorState
+import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
 import org.dueattendant149.kwhale.ui.components.SectionHeader
 import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import org.dueattendant149.kwhale.ui.components.TrackRow
-import org.dueattendant149.kwhale.ui.components.imageUrl
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
+import org.dueattendant149.kwhale.ui.components.imageUrl
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     app: KwhaleApp,
@@ -72,18 +81,29 @@ fun LibraryScreen(
     var playlists by remember { mutableStateOf(cached?.playlists.orEmpty()) }
     var albums by remember { mutableStateOf(cached?.albums.orEmpty()) }
     var loading by remember { mutableStateOf(cached == null) }
+    var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var reload by remember { mutableStateOf(0) }
-    val liked = remember { mutableStateMapOf<String, Boolean>() }
+    var reload by remember { mutableIntStateOf(0) }
+
+    var showCreatePlaylist by remember { mutableStateOf(false) }
+    var newPlaylistTitle by remember { mutableStateOf("") }
+    var creatingPlaylist by remember { mutableStateOf(false) }
+    var createError by remember { mutableStateOf<String?>(null) }
+
+    val likedOverrides by app.reactions.likedOverrides.collectAsState()
+    val playerState by app.player.state.collectAsState()
+    val currentRemoteId = playerState.current?.remoteId
+    val snackbar = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
     LaunchedEffect(reload) {
         if (reload == 0 && cached != null && app.cache.isFresh(ContentCache.LIBRARY, 30_000)) {
             loading = false
+            refreshing = false
             return@LaunchedEffect
         }
-        loading = cached == null
+        loading = cached == null && tracks.isEmpty() && playlists.isEmpty() && albums.isEmpty()
         error = null
         runCatching {
             val tracksPage = app.api.libraryTracks(limit = 100)
@@ -97,18 +117,27 @@ fun LibraryScreen(
                 LibrarySnapshot.serializer(),
                 LibrarySnapshot(tracksPage.items, playlistsPage.items, albumsPage.items),
             )
-        }.onFailure { error = it.message ?: "Ошибка сети" }
+        }.onFailure { err ->
+            val msg = err.message ?: "Ошибка сети"
+            error = msg
+            if (tracks.isNotEmpty() || playlists.isNotEmpty() || albums.isNotEmpty()) {
+                snackbar?.showSnackbar("Не удалось обновить: $msg")
+            }
+        }
         loading = false
+        refreshing = false
     }
 
-    if (loading && tracks.isEmpty()) {
+    if (loading && tracks.isEmpty() && playlists.isEmpty() && albums.isEmpty()) {
         LibrarySkeleton()
         return
     }
-    if (error != null && tracks.isEmpty()) {
+    if (error != null && tracks.isEmpty() && playlists.isEmpty() && albums.isEmpty()) {
         ErrorState(
             message = error ?: "Ошибка сети",
             onRetry = { reload++ },
+            secondaryAction = "Скачанные треки",
+            onSecondaryAction = onDownloads,
             modifier = Modifier.fillMaxSize(),
         )
         return
@@ -143,97 +172,178 @@ fun LibraryScreen(
         )
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
-            top = 12.dp,
-            bottom = 28.dp + miniPlayerBottom,
-        ),
-    ) {
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Библиотека",
-                    style = MaterialTheme.typography.headlineLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onSearch) {
-                    Icon(Icons.Rounded.Search, contentDescription = "Поиск")
-                }
-                IconButton(onClick = onDownloads) {
-                    Icon(Icons.Rounded.Download, contentDescription = "Скачано")
-                }
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = {
+            if (!refreshing) {
+                refreshing = true
+                reload++
             }
-        }
-
-        if (collections.isNotEmpty()) {
-            item { SectionHeader("Альбомы", action = "Все", onAction = { onSeeAll("collections") }) }
+        },
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                end = 20.dp,
+                top = 12.dp,
+                bottom = 28.dp + miniPlayerBottom,
+            ),
+        ) {
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(collections, key = { it.key }) { collection ->
-                        AlbumCard(
-                            title = collection.title,
-                            artist = collection.subtitle,
-                            coverUrl = collection.coverUrl,
-                            coverTitle = if (collection.kind == "playlist") collection.title else null,
-                            onClick = { onOpenCollection(collection.kind, collection.id) },
-                        )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Библиотека",
+                        style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = {
+                        createError = null
+                        newPlaylistTitle = ""
+                        showCreatePlaylist = true
+                    }) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Создать плейлист")
+                    }
+                    IconButton(onClick = onSearch) {
+                        Icon(Icons.Rounded.Search, contentDescription = "Поиск")
+                    }
+                    IconButton(onClick = onDownloads) {
+                        Icon(Icons.Rounded.Download, contentDescription = "Скачано")
                     }
                 }
             }
-        }
 
-        if (tracks.isNotEmpty()) {
-            item {
-                Spacer(Modifier.size(16.dp))
-                Button(
-                    onClick = { app.player.playQueue(tracks.shuffled().map { it.toUi(app.api) }, 0) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                ) {
-                    Icon(Icons.Rounded.Shuffle, null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Перемешать всё")
+            if (collections.isNotEmpty()) {
+                item { SectionHeader("Коллекции", action = "Все", onAction = { onSeeAll("collections") }) }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(collections, key = { it.key }) { collection ->
+                            AlbumCard(
+                                title = collection.title,
+                                artist = collection.subtitle,
+                                coverUrl = collection.coverUrl,
+                                coverTitle = if (collection.kind == "playlist") collection.title else null,
+                                onClick = { onOpenCollection(collection.kind, collection.id) },
+                            )
+                        }
+                    }
                 }
-                SectionHeader("Любимые треки")
             }
-            itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                TrackRow(
-                    track = track,
-                    api = app.api,
-                    liked = liked[track.id] ?: track.isLiked,
-                    onClick = { app.player.playQueue(tracks.map { it.toUi(app.api) }, index) },
-                    onToggleLike = {
-                        val next = liked[track.id] ?: !track.isLiked
-                        liked[track.id] = next
-                        app.cache.invalidateLibrary()
-                        scope.launch {
-                            runCatching {
-                                if (next) app.api.like(track.id) else app.api.unlike(track.id)
+
+            if (tracks.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.size(16.dp))
+                    Button(
+                        onClick = { app.player.playQueue(tracks.shuffled().map { it.toUi(app.api) }, 0) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                    ) {
+                        Icon(Icons.Rounded.Shuffle, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Перемешать всё")
+                    }
+                    SectionHeader(
+                        title = "Любимые треки",
+                        action = "Все",
+                        onAction = { onSeeAll("tracks") },
+                    )
+                }
+                itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                    TrackRow(
+                        track = track,
+                        api = app.api,
+                        liked = app.reactions.isLiked(track.id, track.isLiked, likedOverrides),
+                        isCurrent = track.id == currentRemoteId,
+                        onClick = { app.player.playQueue(tracks.map { it.toUi(app.api) }, index) },
+                        onToggleLike = {
+                            app.cache.invalidateLibrary()
+                            app.reactions.toggleLike(track, app.api, "library") { msg ->
+                                scope.launch { snackbar?.showSnackbar(msg) }
                             }
+                        },
+                        onOverflow = { onTrackMenu(track) },
+                    )
+                }
+            } else {
+                item {
+                    EmptyState(
+                        title = "Пока пусто",
+                        message = "Лайкните трек, чтобы он появился здесь",
+                        action = "Найти музыку",
+                        onAction = onSearch,
+                        secondaryAction = "Скачано",
+                        onSecondaryAction = onDownloads,
+                    )
+                }
+            }
+        }
+    }
+
+    if (showCreatePlaylist) {
+        AlertDialog(
+            onDismissRequest = { if (!creatingPlaylist) showCreatePlaylist = false },
+            title = { Text("Новый плейлист") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = newPlaylistTitle,
+                        onValueChange = { newPlaylistTitle = it },
+                        label = { Text("Название") },
+                        singleLine = true,
+                        enabled = !creatingPlaylist,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    createError?.let { msg ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = newPlaylistTitle.trim().isNotEmpty() && !creatingPlaylist,
+                    onClick = {
+                        val name = newPlaylistTitle.trim()
+                        if (name.isEmpty()) return@TextButton
+                        creatingPlaylist = true
+                        createError = null
+                        scope.launch {
+                            runCatching { app.api.createPlaylist(PlaylistCreate(title = name)) }
+                                .onSuccess { created ->
+                                    app.cache.invalidateLibrary()
+                                    creatingPlaylist = false
+                                    showCreatePlaylist = false
+                                    onOpenCollection("playlist", created.id)
+                                }
+                                .onFailure { err ->
+                                    creatingPlaylist = false
+                                    createError = err.message ?: "Не удалось создать плейлист"
+                                }
                         }
                     },
-                    onOverflow = { onTrackMenu(track) },
-                )
-            }
-        } else {
-            item {
-                EmptyState(
-                    title = "Пока пусто",
-                    message = "Лайкните трек, чтобы он появился здесь",
-                    action = "Найти музыку",
-                    onAction = onSearch,
-                )
-            }
-        }
+                ) {
+                    if (creatingPlaylist) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Создать")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(enabled = !creatingPlaylist, onClick = { showCreatePlaylist = false }) {
+                    Text("Отмена")
+                }
+            },
+        )
     }
 }
 

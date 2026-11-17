@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,16 +18,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,13 +38,14 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
-import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.data.toUi
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
 import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.AlbumCard
 import org.dueattendant149.kwhale.ui.components.EmptyState
 import org.dueattendant149.kwhale.ui.components.ErrorState
+import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
 import org.dueattendant149.kwhale.ui.components.TrackRow
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 
@@ -69,19 +69,16 @@ fun ArtistAllScreen(
                 }
             },
         )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterChip(
+        SecondaryTabRow(selectedTabIndex = tab) {
+            Tab(
                 selected = tab == 0,
                 onClick = { tab = 0 },
-                label = { Text("Треки") },
+                text = { Text("Треки") },
             )
-            FilterChip(
+            Tab(
                 selected = tab == 1,
                 onClick = { tab = 1 },
-                label = { Text("Альбомы") },
+                text = { Text("Альбомы") },
             )
         }
         if (tab == 0) {
@@ -104,7 +101,9 @@ private fun ArtistTracks(
     var loadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableStateOf(0) }
-    val liked = remember { mutableStateMapOf<String, Boolean>() }
+    val likedOverrides by app.reactions.likedOverrides.collectAsState()
+    val playerState by app.player.state.collectAsState()
+    val snackbarHost = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
 
@@ -123,14 +122,21 @@ private fun ArtistTracks(
     }
 
     LaunchedEffect(artistId, refreshKey) {
-        loading = true
+        loading = items.isEmpty()
+        error = null
         runCatching { app.api.artistTracks(artistId, limit = 50) }
             .onSuccess {
                 items = it.items
                 next = it.nextCursor
                 error = null
             }
-            .onFailure { error = it.message ?: "Ошибка сети" }
+            .onFailure {
+                if (items.isEmpty()) {
+                    error = it.message ?: "Ошибка сети"
+                } else {
+                    snackbarHost?.showSnackbar("Не удалось обновить список")
+                }
+            }
         loading = false
     }
 
@@ -144,7 +150,9 @@ private fun ArtistTracks(
                     items = items + it.items
                     next = it.nextCursor
                 }
-                .onFailure { error = it.message ?: "Ошибка сети" }
+                .onFailure {
+                    snackbarHost?.showSnackbar("Не удалось загрузить ещё")
+                }
             loadingMore = false
         }
     }
@@ -160,16 +168,8 @@ private fun ArtistTracks(
             message = error ?: "Ошибка сети",
             onRetry = {
                 loading = true
-                scope.launch {
-                    runCatching { app.api.artistTracks(artistId, limit = 50) }
-                        .onSuccess {
-                            items = it.items
-                            next = it.nextCursor
-                            error = null
-                        }
-                        .onFailure { error = it.message ?: "Ошибка сети" }
-                    loading = false
-                }
+                error = null
+                refreshKey++
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -191,20 +191,21 @@ private fun ArtistTracks(
             bottom = 24.dp + miniPlayerBottom,
         ),
     ) {
-        itemsIndexed(items, key = { _, track -> track.id }) { index, track ->
+        itemsIndexed(items, key = { index, track -> "${track.id}:$index" }) { index, track ->
+            val isLiked = app.reactions.isLiked(track.id, track.isLiked, likedOverrides)
             TrackRow(
                 track = track,
                 api = app.api,
-                liked = liked[track.id] ?: track.isLiked,
+                liked = isLiked,
+                isCurrent = playerState.current?.remoteId == track.id,
                 onClick = { app.player.playQueue(items.map { it.toUi(app.api) }, index) },
                 onToggleLike = {
-                    val value = liked[track.id] ?: !track.isLiked
-                    liked[track.id] = value
-                    scope.launch {
-                        runCatching {
-                            if (value) app.api.like(track.id) else app.api.unlike(track.id)
-                        }
-                    }
+                    app.reactions.toggleLike(
+                        track = track,
+                        api = app.api,
+                        surface = "artist_all",
+                        onError = { msg -> scope.launch { snackbarHost?.showSnackbar(msg) } },
+                    )
                 },
                 onOverflow = { onTrackMenu(track) },
             )
@@ -235,6 +236,7 @@ private fun ArtistAlbums(
     var loadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableStateOf(0) }
+    val snackbarHost = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
     val miniPlayerBottom = LocalMiniPlayerBottomPadding.current
@@ -254,14 +256,21 @@ private fun ArtistAlbums(
     }
 
     LaunchedEffect(artistId, refreshKey) {
-        loading = true
+        loading = items.isEmpty()
+        error = null
         runCatching { app.api.artistAlbums(artistId, limit = 50) }
             .onSuccess {
                 items = it.items
                 next = it.nextCursor
                 error = null
             }
-            .onFailure { error = it.message ?: "Ошибка сети" }
+            .onFailure {
+                if (items.isEmpty()) {
+                    error = it.message ?: "Ошибка сети"
+                } else {
+                    snackbarHost?.showSnackbar("Не удалось обновить список")
+                }
+            }
         loading = false
     }
 
@@ -275,7 +284,9 @@ private fun ArtistAlbums(
                     items = items + it.items
                     next = it.nextCursor
                 }
-                .onFailure { error = it.message ?: "Ошибка сети" }
+                .onFailure {
+                    snackbarHost?.showSnackbar("Не удалось загрузить ещё")
+                }
             loadingMore = false
         }
     }
@@ -291,16 +302,8 @@ private fun ArtistAlbums(
             message = error ?: "Ошибка сети",
             onRetry = {
                 loading = true
-                scope.launch {
-                    runCatching { app.api.artistAlbums(artistId, limit = 50) }
-                        .onSuccess {
-                            items = it.items
-                            next = it.nextCursor
-                            error = null
-                        }
-                        .onFailure { error = it.message ?: "Ошибка сети" }
-                    loading = false
-                }
+                error = null
+                refreshKey++
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -315,27 +318,28 @@ private fun ArtistAlbums(
         return
     }
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+        columns = GridCells.Adaptive(minSize = 156.dp),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = 20.dp,
             end = 20.dp,
-            top = 8.dp,
+            top = 12.dp,
             bottom = 24.dp + miniPlayerBottom,
         ),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(items, key = { it.id }) { album ->
             Box(
-                modifier = Modifier.fillMaxWidth().padding(6.dp),
+                modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
                 AlbumCard(
                     album = album,
                     api = app.api,
                     onClick = { onOpenCollection("album", album.id) },
-                    width = 150,
+                    width = 152,
                 )
             }
         }

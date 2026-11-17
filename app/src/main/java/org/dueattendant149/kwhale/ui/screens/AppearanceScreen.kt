@@ -6,13 +6,15 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +24,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,15 +50,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import org.dueattendant149.kwhale.design.ThemeMode
 import org.dueattendant149.kwhale.design.KwhaleAccent
 import org.dueattendant149.kwhale.design.KwhaleAccents
 import org.dueattendant149.kwhale.design.KwhaleSpacing
+import org.dueattendant149.kwhale.design.KwhaleTheme
+import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
+import org.dueattendant149.kwhale.design.ThemeMode
 import org.dueattendant149.kwhale.design.mix
 
 /**
@@ -66,7 +77,7 @@ import org.dueattendant149.kwhale.design.mix
  *  - the selected mode chip used to be tinted with a fixed brown. It now follows
  *    the active theme's container colours, which is what the user is choosing.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AppearanceScreen(
     currentMode: ThemeMode,
@@ -80,10 +91,10 @@ fun AppearanceScreen(
     var dynamicColor by remember(monet) { mutableStateOf(monet) }
 
     val modes = listOf(
+        ThemeMode.SYSTEM to "Системная",
         ThemeMode.DARK to "Тёмная",
         ThemeMode.LIGHT to "Светлая",
         ThemeMode.AMOLED to "AMOLED",
-        ThemeMode.MONET to "Системная",
     )
 
     Column(Modifier.fillMaxSize()) {
@@ -101,7 +112,7 @@ fun AppearanceScreen(
             contentPadding = PaddingValues(
                 start = KwhaleSpacing.gutter,
                 end = KwhaleSpacing.gutter,
-                bottom = KwhaleSpacing.xxl,
+                bottom = KwhaleSpacing.xxl + LocalMiniPlayerBottomPadding.current,
             ),
         ) {
             item {
@@ -113,14 +124,17 @@ fun AppearanceScreen(
                 )
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(KwhaleSpacing.xs)) {
+                FlowRow(
+                    modifier = Modifier.selectableGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(KwhaleSpacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(KwhaleSpacing.xs),
+                ) {
                     modes.forEach { (mode, label) ->
                         ModeChip(
                             label = label,
                             selected = selectedMode == mode,
                             onClick = {
                                 selectedMode = mode
-                                dynamicColor = mode == ThemeMode.MONET
                                 onChanged(mode, selectedAccent, dynamicColor)
                             },
                         )
@@ -132,7 +146,17 @@ fun AppearanceScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = KwhaleSpacing.md),
+                        .padding(top = KwhaleSpacing.md)
+                        .clip(RoundedCornerShape(14.dp))
+                        .toggleable(
+                            value = dynamicColor,
+                            role = Role.Switch,
+                            onValueChange = {
+                                dynamicColor = it
+                                onChanged(selectedMode, selectedAccent, it)
+                            },
+                        )
+                        .padding(vertical = KwhaleSpacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -143,16 +167,10 @@ fun AppearanceScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    Spacer(Modifier.width(KwhaleSpacing.sm))
                     Switch(
                         checked = dynamicColor,
-                        onCheckedChange = {
-                            dynamicColor = it
-                            onChanged(
-                                if (it) ThemeMode.MONET else selectedMode,
-                                selectedAccent,
-                                it,
-                            )
-                        },
+                        onCheckedChange = null,
                     )
                 }
             }
@@ -167,7 +185,22 @@ fun AppearanceScreen(
                 )
             }
             item {
-                AppearancePreview(accent = KwhaleAccents.byId(selectedAccent))
+                AppearancePreview(
+                    mode = selectedMode,
+                    accent = KwhaleAccents.byId(selectedAccent),
+                    monet = dynamicColor,
+                )
+            }
+
+            if (dynamicColor) {
+                item {
+                    Text(
+                        text = "Включён динамический цвет — выбор акцента отключит его автоматически",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = KwhaleSpacing.sm),
+                    )
+                }
             }
 
             // ── accents, grouped ─────────────────────────────────────────────
@@ -182,16 +215,20 @@ fun AppearanceScreen(
                 }
                 item {
                     LazyRow(
+                        modifier = Modifier
+                            .selectableGroup()
+                            .alpha(if (dynamicColor) 0.72f else 1f),
                         horizontalArrangement = Arrangement.spacedBy(KwhaleSpacing.sm),
                         contentPadding = PaddingValues(vertical = KwhaleSpacing.xxs),
                     ) {
                         items(family.accents, key = { it.id }) { accent ->
                             AccentSwatch(
                                 accent = accent,
-                                selected = accent.id == selectedAccent,
+                                selected = !dynamicColor && accent.id == selectedAccent,
                                 onClick = {
                                     selectedAccent = accent.id
-                                    onChanged(selectedMode, selectedAccent, dynamicColor)
+                                    dynamicColor = false
+                                    onChanged(selectedMode, selectedAccent, false)
                                 },
                             )
                         }
@@ -218,20 +255,23 @@ private fun ModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
     )
     val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
     else MaterialTheme.colorScheme.onSurfaceVariant
-    val elevation by animateDpAsState(
-        targetValue = if (selected) 0.dp else 0.dp,
-        label = "modeElevation",
-    )
 
     Surface(
-        onClick = onClick,
+        modifier = Modifier
+            .clip(CircleShape)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            ),
         shape = CircleShape,
         color = container,
-        tonalElevation = elevation,
         border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = KwhaleSpacing.md, vertical = KwhaleSpacing.xs),
+            modifier = Modifier
+                .defaultMinSize(minHeight = 40.dp)
+                .padding(horizontal = KwhaleSpacing.md, vertical = KwhaleSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selected) {
@@ -269,7 +309,13 @@ private fun AccentSwatch(accent: KwhaleAccent, selected: Boolean, onClick: () ->
     Box(
         modifier = Modifier
             .size(52.dp)
-            .clickable(onClick = onClick),
+            .clip(CircleShape)
+            .semantics { contentDescription = accent.name }
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -304,103 +350,102 @@ private fun AccentSwatch(accent: KwhaleAccent, selected: Boolean, onClick: () ->
 }
 
 /**
- * Miniature of the real player: the one screen where an accent is most visible.
- * Everything here uses the accent directly instead of theme colours so the
- * preview stays truthful before the theme is applied.
+ * Miniature of the real player: rendered under the user's selected theme
+ * (brightness + accent or dynamic wallpaper palette) so the preview stays truthful.
  */
 @Composable
-private fun AppearancePreview(accent: KwhaleAccent) {
-    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val onAccent = if (accent.color.luminance() > 0.55f) Color(0xFF101216) else Color.White
-    val plate = if (dark) Color(0xFF1B1D22) else Color(0xFFF1F2F6)
-    val textPrimary = if (dark) Color(0xFFF2F3F5) else Color(0xFF16181D)
-    val textSecondary = textPrimary.copy(alpha = 0.6f)
-
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = plate,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(KwhaleSpacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // artwork placeholder tinted with the accent
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(accent.color, accent.color.mix(Color.Black, 0.45f)),
-                            ),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        tint = onAccent,
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
-                Spacer(Modifier.width(KwhaleSpacing.sm))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Ночной эфир",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = textPrimary,
-                    )
-                    Text(
-                        "Мира Ким",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = textSecondary,
-                    )
-                    Spacer(Modifier.height(KwhaleSpacing.xs))
-                    // progress bar drawn with the accent
+private fun AppearancePreview(
+    mode: ThemeMode,
+    accent: KwhaleAccent,
+    monet: Boolean,
+) {
+    KwhaleTheme(mode = mode, accent = accent, monet = monet) {
+        val scheme = MaterialTheme.colorScheme
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = scheme.surfaceContainer,
+            border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.6f)),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(KwhaleSpacing.md)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(CircleShape)
-                            .background(textPrimary.copy(alpha = 0.12f)),
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(scheme.primary, scheme.primary.mix(Color.Black, 0.45f)),
+                                ),
+                            ),
+                        contentAlignment = Alignment.Center,
                     ) {
+                        Icon(
+                            Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            tint = scheme.onPrimary,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(KwhaleSpacing.sm))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Ночной эфир",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = scheme.onSurface,
+                        )
+                        Text(
+                            "Мира Ким",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(KwhaleSpacing.xs))
                         Box(
                             Modifier
-                                .fillMaxWidth(0.42f)
+                                .fillMaxWidth()
                                 .height(4.dp)
                                 .clip(CircleShape)
-                                .background(accent.color),
+                                .background(scheme.surfaceVariant),
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(0.42f)
+                                    .height(4.dp)
+                                    .clip(CircleShape)
+                                    .background(scheme.primary),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(KwhaleSpacing.sm))
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(scheme.primary),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Pause,
+                            contentDescription = null,
+                            tint = scheme.onPrimary,
+                            modifier = Modifier.size(22.dp),
                         )
                     }
                 }
-                Spacer(Modifier.width(KwhaleSpacing.sm))
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(accent.color),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.Pause,
-                        contentDescription = null,
-                        tint = onAccent,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.height(KwhaleSpacing.sm))
-            Row(horizontalArrangement = Arrangement.spacedBy(KwhaleSpacing.xs)) {
-                listOf("Слушать", "В очередь").forEachIndexed { index, label ->
-                    Surface(
-                        shape = CircleShape,
-                        color = if (index == 0) accent.color else textPrimary.copy(alpha = 0.08f),
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (index == 0) onAccent else textPrimary.copy(alpha = 0.8f),
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                        )
+                Spacer(Modifier.height(KwhaleSpacing.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(KwhaleSpacing.xs)) {
+                    listOf("Слушать", "В очередь").forEachIndexed { index, label ->
+                        Surface(
+                            shape = CircleShape,
+                            color = if (index == 0) scheme.primary else scheme.secondaryContainer,
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (index == 0) scheme.onPrimary else scheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                            )
+                        }
                     }
                 }
             }

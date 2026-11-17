@@ -8,6 +8,8 @@ import org.dueattendant149.kwhale.network.model.Artist
 import org.dueattendant149.kwhale.network.model.ArtistSyncStatus
 import org.dueattendant149.kwhale.network.model.ArtistsPage
 import org.dueattendant149.kwhale.network.model.AuthResponse
+import org.dueattendant149.kwhale.network.model.CensorshipReportRequest
+import org.dueattendant149.kwhale.network.model.CensorshipReportResponse
 import org.dueattendant149.kwhale.network.model.Config
 import org.dueattendant149.kwhale.network.model.Event
 import org.dueattendant149.kwhale.network.model.EventBatch
@@ -300,6 +302,28 @@ class KwhaleApi(
     suspend fun unlike(trackId: String) = client.deleteUnit("/tracks/$trackId/like")
     suspend fun dislike(trackId: String) = client.putUnit("/tracks/$trackId/dislike")
     suspend fun undislike(trackId: String) = client.deleteUnit("/tracks/$trackId/dislike")
+
+    /** Flag a track for admin censorship review (see server_changes.md). */
+    suspend fun reportCensorship(
+        trackId: String,
+        reason: String = "censored",
+        comment: String? = null,
+        positionMs: Long? = null,
+    ): CensorshipReportResponse {
+        val body = json.encodeToString(
+            CensorshipReportRequest.serializer(),
+            CensorshipReportRequest(reason = reason, comment = comment, positionMs = positionMs),
+        )
+        return client.post(
+            "/tracks/$trackId/censorship",
+            body,
+            CensorshipReportResponse.serializer(),
+            headers = idempotencyHeader(),
+        )
+    }
+
+    suspend fun cancelCensorshipReport(trackId: String) =
+        client.deleteUnit("/tracks/$trackId/censorship")
 
     suspend fun lyrics(trackId: String): Lyrics =
         client.get("/tracks/$trackId/lyrics", Lyrics.serializer())

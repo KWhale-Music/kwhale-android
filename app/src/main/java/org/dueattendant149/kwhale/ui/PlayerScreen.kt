@@ -1,12 +1,10 @@
 package org.dueattendant149.kwhale.ui
 
 import android.content.Intent
-import android.media.audiofx.AudioEffect
-import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,45 +17,64 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.ThumbDown
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
-import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -73,8 +90,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,8 +106,10 @@ import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.KwhaleCoverPalette
 import org.dueattendant149.kwhale.design.KwhaleSpacing
+import org.dueattendant149.kwhale.design.rememberReducedMotionEnabled
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.player.PlaybackState
+import org.dueattendant149.kwhale.player.RepeatMode as PlayerRepeatMode
 import org.dueattendant149.kwhale.ui.components.CoverArt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,6 +117,7 @@ import org.dueattendant149.kwhale.ui.components.CoverArt
 fun PlayerScreen(
     app: KwhaleApp,
     state: PlaybackState,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onClose: () -> Unit,
     onOpenArtist: (String) -> Unit,
     onOpenAlbum: (String) -> Unit,
@@ -102,13 +128,31 @@ fun PlayerScreen(
     val track = state.current ?: return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val reducedMotion = rememberReducedMotionEnabled()
+
     val isLight = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     val content = if (isLight) MaterialTheme.colorScheme.onSurface else Color.White
     val secondary = content.copy(alpha = 0.62f)
     val accent = MaterialTheme.colorScheme.primary
 
-    var liked by remember(track.id, track.isLiked) { mutableStateOf(track.isLiked) }
-    var disliked by remember(track.id, track.isDisliked) { mutableStateOf(track.isDisliked) }
+    val likedOverrides by app.reactions.likedOverrides.collectAsState()
+    val dislikedOverrides by app.reactions.dislikedOverrides.collectAsState()
+    val censorshipOverrides by app.reactions.censorshipOverrides.collectAsState()
+    val censorshipInFlight by app.reactions.censorshipInFlight.collectAsState()
+    val playbackError by app.player.playbackError.collectAsState()
+
+    val trackKey = track.remoteId ?: track.id.toString()
+    val liked = app.reactions.isLiked(trackKey, track.isLiked, likedOverrides)
+    val disliked = app.reactions.isDisliked(trackKey, track.isDisliked, dislikedOverrides)
+    val censorshipReported = app.reactions.isCensorshipReported(
+        trackId = trackKey,
+        serverReported = track.isCensorshipReported,
+        overrides = censorshipOverrides,
+    )
+    val censorshipBusy = trackKey in censorshipInFlight
+
+    var loadingMenu by remember(track.id) { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf<Float?>(null) }
     val smoothedProgress by animateFloatAsState(
         targetValue = state.progress,
@@ -125,14 +169,545 @@ fun PlayerScreen(
         label = "playerLikeScale",
     )
 
-    // The target carries the artwork it belongs to. Reading the outer `track`
-    // inside AnimatedContent made the outgoing layer render the incoming cover
-    // and left the previous blurred background on screen until Coil finished.
     val artwork = PlayerArtwork(
         id = track.remoteId ?: track.id.toString(),
         coverUrl = track.coverUrl,
         title = track.title,
     )
+    val artworkSwipeOffset = remember(artwork.id) { Animatable(0f) }
+
+    fun showPlayerMsg(message: String) {
+        scope.launch {
+            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+        }
+    }
+
+    @Composable
+    fun PlayerHeader() {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(
+                    Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "Свернуть",
+                    tint = content,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "Сейчас играет",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = secondary,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (state.isPlaying) {
+                        EqualizerIndicator(color = accent, modifier = Modifier.padding(end = 6.dp))
+                    }
+                    Text(
+                        text = track.artist,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = content,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(onClick = { shareTrack(app, context, track) }) {
+                Icon(
+                    Icons.Rounded.Share,
+                    contentDescription = "Поделиться",
+                    tint = content,
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun PlayerArtworkCard(modifier: Modifier = Modifier) {
+        val shape = RoundedCornerShape(20.dp)
+        val swipeThresholdPx = with(density) { 72.dp.toPx() }
+        val maxSwipePx = with(density) { 140.dp.toPx() }
+
+        Box(
+            modifier = modifier.pointerInput(artwork.id) {
+                var totalDrag = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { totalDrag = 0f },
+                    onDragCancel = {
+                        totalDrag = 0f
+                        scope.launch { artworkSwipeOffset.animateTo(0f, spring()) }
+                    },
+                    onDragEnd = {
+                        val delta = totalDrag
+                        totalDrag = 0f
+                        when {
+                            delta > swipeThresholdPx -> app.player.previous()
+                            delta < -swipeThresholdPx -> app.player.next()
+                        }
+                        scope.launch { artworkSwipeOffset.animateTo(0f, spring()) }
+                    },
+                ) { change, dragAmount ->
+                    change.consume()
+                    totalDrag = (totalDrag + dragAmount).coerceIn(-maxSwipePx, maxSwipePx)
+                    if (!reducedMotion) {
+                        scope.launch { artworkSwipeOffset.snapTo(totalDrag) }
+                    }
+                }
+            },
+        ) {
+            AnimatedContent(
+                targetState = artwork,
+                transitionSpec = { fadeIn(tween(280)) togetherWith fadeOut(tween(160)) },
+                label = "artwork",
+            ) { art ->
+                key(art.id) {
+                    CoverArt(
+                        imageUrl = art.coverUrl,
+                        contentDescription = "Обложка: ${art.title}",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .graphicsLayer {
+                                translationX = if (reducedMotion) 0f else artworkSwipeOffset.value
+                            }
+                            .then(
+                                if (isLight) Modifier.shadow(16.dp, shape)
+                                else Modifier,
+                            ),
+                        shape = shape,
+                        iconSize = 64,
+                        seed = art.title,
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun ColumnScope.PlayerControlsSection(isTwoPane: Boolean) {
+        // ── title / actions ──────────────────────────────────────────────
+        AnimatedContent(
+            targetState = track.title,
+            transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(140)) },
+            label = "title",
+        ) { title ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val canOpenCollection = !track.albumRemoteId.isNullOrBlank() || !track.artistRemoteId.isNullOrBlank()
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = content,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(
+                            enabled = canOpenCollection,
+                            onClickLabel = "Открыть альбом",
+                        ) {
+                            val albumId = track.albumRemoteId
+                            if (!albumId.isNullOrBlank()) onOpenAlbum(albumId)
+                            else track.artistRemoteId?.let(onOpenArtist)
+                        },
+                    )
+                    Text(
+                        text = track.artist,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(
+                            enabled = !track.artistRemoteId.isNullOrBlank(),
+                            onClickLabel = "Открыть исполнителя",
+                        ) {
+                            track.artistRemoteId?.let(onOpenArtist)
+                        },
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        app.reactions.toggleDislike(
+                            track = track,
+                            surface = "player",
+                            onChanged = { nowDisliked ->
+                                if (nowDisliked) app.player.next()
+                            },
+                            onError = ::showPlayerMsg,
+                        )
+                    },
+                    modifier = Modifier.semantics {
+                        stateDescription = if (disliked) "Скрыто" else "Не скрыто"
+                    },
+                ) {
+                    Icon(
+                        Icons.Outlined.ThumbDown,
+                        contentDescription = "Скрыть из рекомендаций",
+                        tint = if (disliked) accent else secondary,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .semantics(mergeDescendants = true) {
+                            role = Role.Button
+                            stateDescription = if (liked) "В моей музыке" else "Не в моей музыке"
+                        }
+                        .clickable(
+                            onClickLabel = if (liked) "Убрать из моей музыки" else "В мою музыку",
+                        ) {
+                            app.reactions.toggleLike(
+                                track = track,
+                                surface = "player",
+                                onError = ::showPlayerMsg,
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (liked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (liked) "Убрать из моей музыки" else "В мою музыку",
+                        tint = if (liked) accent else secondary,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .graphicsLayer {
+                                scaleX = likedScale
+                                scaleY = likedScale
+                            },
+                    )
+                }
+            }
+        }
+
+        playbackError?.let { errMsg ->
+            Spacer(Modifier.height(KwhaleSpacing.xs))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.92f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = KwhaleSpacing.sm, end = KwhaleSpacing.xxs, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = errMsg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    TextButton(onClick = { app.player.retryCurrent() }) {
+                        Text("Повторить", color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                    IconButton(onClick = { app.player.clearError() }) {
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = "Скрыть ошибку",
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(KwhaleSpacing.sm))
+
+        // ── progress ─────────────────────────────────────────────────────
+        val sliderValue = dragValue ?: smoothedProgress
+        Slider(
+            value = sliderValue,
+            onValueChange = { dragValue = it },
+            onValueChangeFinished = {
+                dragValue?.let { app.player.seekTo((it * state.durationMs).toLong()) }
+                dragValue = null
+            },
+            modifier = Modifier.fillMaxWidth(),
+            thumb = {
+                Box(
+                    Modifier
+                        .size(20.dp)
+                        .background(accent, CircleShape),
+                )
+            },
+            colors = SliderDefaults.colors(
+                activeTrackColor = accent,
+                inactiveTrackColor = content.copy(alpha = 0.22f),
+            ),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = formatVkTime(
+                    if (dragValue != null) (dragValue!! * state.durationMs).toLong()
+                    else state.positionMs,
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = secondary,
+            )
+            Text(
+                text = formatVkTime(state.durationMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = secondary,
+            )
+        }
+
+        Spacer(Modifier.height(KwhaleSpacing.md))
+
+        // ── transport ────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val repeatDescription = when (state.repeatMode) {
+                PlayerRepeatMode.OFF -> "Повтор: выключен"
+                PlayerRepeatMode.ALL -> "Повтор: вся очередь"
+                PlayerRepeatMode.ONE -> "Повтор: один трек"
+            }
+            IconButton(
+                onClick = app.player::toggleRepeat,
+                modifier = Modifier.semantics { stateDescription = repeatDescription },
+            ) {
+                Icon(
+                    imageVector = if (state.repeatMode == PlayerRepeatMode.ONE) {
+                        Icons.Rounded.RepeatOne
+                    } else {
+                        Icons.Rounded.Repeat
+                    },
+                    contentDescription = repeatDescription,
+                    tint = if (state.repeatMode != PlayerRepeatMode.OFF) accent else content,
+                )
+            }
+            IconButton(onClick = app.player::previous, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    Icons.Rounded.SkipPrevious,
+                    contentDescription = "Предыдущий",
+                    tint = content,
+                    modifier = Modifier.size(36.dp),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(if (isLight) content.copy(alpha = 0.12f) else Color.White)
+                    .semantics(mergeDescendants = true) {
+                        role = Role.Button
+                        stateDescription = when {
+                            state.isBuffering -> "Буферизация"
+                            state.isPlaying -> "Играет"
+                            else -> "Пауза"
+                        }
+                    }
+                    .clickable(
+                        onClickLabel = if (state.isPlaying) "Пауза" else "Играть",
+                        onClick = app.player::toggle,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (state.isBuffering) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(64.dp),
+                        strokeWidth = 2.5.dp,
+                        color = accent,
+                    )
+                }
+                AnimatedContent(
+                    targetState = state.isPlaying,
+                    transitionSpec = {
+                        fadeIn(tween(120)) togetherWith fadeOut(tween(80))
+                    },
+                    label = "playPause",
+                ) { playing ->
+                    Icon(
+                        imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (playing) "Пауза" else "Играть",
+                        tint = if (isLight) accent else Color.Black,
+                        modifier = Modifier.size(34.dp),
+                    )
+                }
+            }
+            IconButton(onClick = app.player::next, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    Icons.Rounded.SkipNext,
+                    contentDescription = "Следующий",
+                    tint = content,
+                    modifier = Modifier.size(36.dp),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (state.shuffle) accent.copy(alpha = 0.16f) else Color.Transparent)
+                    .semantics(mergeDescendants = true) {
+                        role = Role.Button
+                        stateDescription = if (state.shuffle) "Включено" else "Выключено"
+                    }
+                    .clickable(
+                        onClickLabel = "Перемешать",
+                        onClick = app.player::toggleShuffle,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Shuffle,
+                    contentDescription = "Перемешать",
+                    tint = if (state.shuffle) accent else content,
+                )
+            }
+        }
+
+        if (!isTwoPane) {
+            Spacer(Modifier.weight(1f))
+        } else {
+            Spacer(Modifier.height(KwhaleSpacing.md))
+        }
+
+        // ── secondary row: Текст | Цензура (1 клик) | Очередь | Ещё ──────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = KwhaleSpacing.lg),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .semantics { role = Role.Button }
+                    .clickable(onClick = onLyrics)
+                    .padding(horizontal = KwhaleSpacing.sm),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Текст",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = content,
+                )
+            }
+            IconButton(
+                enabled = !censorshipBusy,
+                onClick = {
+                    app.reactions.reportCensorshipOneClick(
+                        track = track,
+                        positionMs = state.positionMs,
+                        onAlreadyReported = {
+                            scope.launch {
+                                val res = snackbarHostState.showSnackbar(
+                                    message = "Трек уже отправлен на пересмотр",
+                                    actionLabel = "Отменить",
+                                    duration = SnackbarDuration.Long,
+                                )
+                                if (res == SnackbarResult.ActionPerformed) {
+                                    app.reactions.cancelCensorshipReport(
+                                        track = track,
+                                        onCancelled = { showPlayerMsg("Отправка на пересмотр отменена") },
+                                        onError = ::showPlayerMsg,
+                                    )
+                                }
+                            }
+                        },
+                        onSent = {
+                            scope.launch {
+                                val res = snackbarHostState.showSnackbar(
+                                    message = "Отправлено на пересмотр в админку",
+                                    actionLabel = "Отменить",
+                                    duration = SnackbarDuration.Long,
+                                )
+                                if (res == SnackbarResult.ActionPerformed) {
+                                    app.reactions.cancelCensorshipReport(
+                                        track = track,
+                                        onCancelled = { showPlayerMsg("Отправка отменена") },
+                                        onError = ::showPlayerMsg,
+                                    )
+                                }
+                            }
+                        },
+                        onError = ::showPlayerMsg,
+                    )
+                },
+                modifier = Modifier.semantics {
+                    stateDescription = if (censorshipReported) "Отправлено на пересмотр" else "Не отправлено"
+                },
+            ) {
+                if (censorshipBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = content,
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (censorshipReported) Icons.Rounded.Flag else Icons.Outlined.Flag,
+                        contentDescription = if (censorshipReported) {
+                            "Отправлено на пересмотр (цензура)"
+                        } else {
+                            "Отправить на цензуру"
+                        },
+                        tint = if (censorshipReported) MaterialTheme.colorScheme.error else content,
+                    )
+                }
+            }
+            IconButton(onClick = onQueue) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.QueueMusic,
+                    contentDescription = "Очередь",
+                    tint = content,
+                )
+            }
+            IconButton(
+                enabled = !loadingMenu,
+                onClick = {
+                    val id = track.remoteId
+                    if (id == null) {
+                        showPlayerMsg("Меню недоступно для локального файла")
+                        return@IconButton
+                    }
+                    loadingMenu = true
+                    scope.launch {
+                        runCatching { app.api.track(id) }
+                            .onSuccess {
+                                loadingMenu = false
+                                onMenu(it)
+                            }
+                            .onFailure {
+                                loadingMenu = false
+                                showPlayerMsg("Не удалось загрузить меню трека")
+                            }
+                    }
+                },
+            ) {
+                if (loadingMenu) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = content,
+                    )
+                } else {
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "Ещё", tint = content)
+                }
+            }
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         AnimatedContent(
@@ -148,340 +723,77 @@ fun PlayerScreen(
             )
         }
 
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = KwhaleSpacing.gutter),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .navigationBarsPadding(),
         ) {
-            // ── header ────────────────────────────────────────────────────────
-            // Shows the artist, not the raw `album` field: connector albums are
-            // often distributor strings ("Uzden.net"), which read as garbage
-            // where a listener expects the performer.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(58.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onClose) {
-                    Icon(
-                        Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "Свернуть",
-                        tint = content,
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = "Сейчас играет",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = secondary,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (state.isPlaying) {
-                            EqualizerIndicator(color = accent, modifier = Modifier.padding(end = 6.dp))
-                        }
-                        Text(
-                            text = track.artist,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = content,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                IconButton(onClick = { shareTrack(context, track) }) {
-                    Icon(
-                        Icons.Rounded.Share,
-                        contentDescription = "Поделиться",
-                        tint = content,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(KwhaleSpacing.sm))
-
-            // ── artwork ──────────────────────────────────────────────────────
-            // Crossfades between tracks and never shows an empty plate: a
-            // cover-less track gets its own gradient + initial.
-            val shape = RoundedCornerShape(20.dp)
-            AnimatedContent(
-                targetState = artwork,
-                transitionSpec = { fadeIn(tween(280)) togetherWith fadeOut(tween(160)) },
-                label = "artwork",
-            ) { art ->
-                key(art.id) {
-                    CoverArt(
-                        imageUrl = art.coverUrl,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .then(
-                                if (isLight) Modifier.shadow(16.dp, shape)
-                                else Modifier,
-                            ),
-                        shape = shape,
-                        iconSize = 64,
-                        seed = art.title,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(KwhaleSpacing.lg))
-
-            // ── title / actions ──────────────────────────────────────────────
-            AnimatedContent(
-                targetState = track.title,
-                transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(140)) },
-                label = "title",
-            ) { title ->
+            val boxMaxWidth = maxWidth
+            val boxMaxHeight = maxHeight
+            val isTwoPane = boxMaxWidth >= 600.dp || boxMaxWidth > boxMaxHeight
+            if (isTwoPane) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = KwhaleSpacing.gutter),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(KwhaleSpacing.xl),
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = content,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.clickable {
-                                val albumId = track.albumRemoteId
-                                if (!albumId.isNullOrBlank()) onOpenAlbum(albumId)
-                                else track.artistRemoteId?.let(onOpenArtist)
-                            },
-                        )
-                        Text(
-                            text = track.artist,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = secondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.clickable {
-                                track.artistRemoteId?.let(onOpenArtist)
-                            },
-                        )
-                    }
-
-                    // Unlike = a real "hide" affordance, kept quiet until needed.
-                    IconButton(onClick = {
-                        disliked = !disliked
-                        if (disliked) liked = false
-                        val remoteId = track.remoteId ?: return@IconButton
-                        scope.launch {
-                            runCatching {
-                                if (disliked) app.api.dislike(remoteId) else app.api.undislike(remoteId)
-                            }
-                            if (disliked) app.player.next()
-                        }
-                    }) {
-                        Icon(
-                            Icons.Outlined.ThumbDown,
-                            contentDescription = "Скрыть из рекомендаций",
-                            tint = if (disliked) accent else secondary,
-                        )
-                    }
-
-                    // Like is a heart everywhere else in the app — it was a
-                    // checkmark here, which nobody reads as "save to library".
                     Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .clickable {
-                                liked = !liked
-                                if (liked) disliked = false
-                                app.player.updateTrackLiked(track.id, liked)
-                                val remoteId = track.remoteId ?: return@clickable
-                                scope.launch {
-                                    runCatching {
-                                        if (liked) app.api.like(remoteId) else app.api.unlike(remoteId)
-                                    }
-                                }
-                            },
+                        modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = if (liked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = if (liked) "Убрать из моей музыки" else "В мою музыку",
-                            tint = if (liked) accent else secondary,
-                            modifier = Modifier
-                                .size(26.dp)
-                                .graphicsLayer {
-                                    scaleX = likedScale
-                                    scaleY = likedScale
-                                },
+                        PlayerArtworkCard(
+                            modifier = Modifier.widthIn(
+                                max = (boxMaxHeight * 0.78f).coerceAtLeast(180.dp).coerceAtMost(380.dp),
+                            ),
                         )
                     }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        PlayerHeader()
+                        Spacer(Modifier.height(KwhaleSpacing.sm))
+                        PlayerControlsSection(isTwoPane = true)
+                    }
                 }
-            }
-
-            Spacer(Modifier.height(KwhaleSpacing.sm))
-
-            // ── progress ─────────────────────────────────────────────────────
-            val sliderValue = dragValue ?: smoothedProgress
-            Slider(
-                value = sliderValue,
-                onValueChange = { dragValue = it },
-                onValueChangeFinished = {
-                    dragValue?.let { app.player.seekTo((it * state.durationMs).toLong()) }
-                    dragValue = null
-                },
-                modifier = Modifier.fillMaxWidth(),
-                thumb = {
-                    Box(
-                        Modifier
-                            .size(20.dp)
-                            .background(accent, CircleShape),
-                    )
-                },
-                colors = SliderDefaults.colors(
-                    activeTrackColor = accent,
-                    inactiveTrackColor = content.copy(alpha = 0.22f),
-                ),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = formatVkTime(
-                        if (dragValue != null) (dragValue!! * state.durationMs).toLong()
-                        else state.positionMs,
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = secondary,
-                )
-                Text(
-                    text = formatVkTime(state.durationMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = secondary,
-                )
-            }
-
-            Spacer(Modifier.height(KwhaleSpacing.md))
-
-            // ── transport ────────────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = app.player::toggleRepeat) {
-                    Icon(
-                        Icons.Rounded.Repeat,
-                        contentDescription = "Повтор",
-                        tint = if (state.repeat) accent else content,
-                    )
-                }
-                IconButton(onClick = app.player::previous, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        Icons.Rounded.SkipPrevious,
-                        contentDescription = "Предыдущий",
-                        tint = content,
-                        modifier = Modifier.size(36.dp),
-                    )
-                }
-                Box(
+            } else {
+                val maxArtworkWidth = (boxMaxHeight * 0.46f).coerceAtLeast(180.dp)
+                Column(
                     modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(if (isLight) content.copy(alpha = 0.12f) else Color.White)
-                        .clickable(onClick = app.player::toggle),
-                    contentAlignment = Alignment.Center,
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
                 ) {
-                    AnimatedContent(
-                        targetState = state.isPlaying,
-                        transitionSpec = {
-                            fadeIn(tween(120)) togetherWith fadeOut(tween(80))
-                        },
-                        label = "playPause",
-                    ) { playing ->
-                        Icon(
-                            imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (playing) "Пауза" else "Играть",
-                            tint = if (isLight) accent else Color.Black,
-                            modifier = Modifier.size(34.dp),
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = boxMaxHeight)
+                            .padding(horizontal = KwhaleSpacing.gutter),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        PlayerHeader()
+                        Spacer(Modifier.height(KwhaleSpacing.sm))
+                        PlayerArtworkCard(
+                            modifier = Modifier.widthIn(max = maxArtworkWidth),
                         )
+                        Spacer(Modifier.height(KwhaleSpacing.lg))
+                        PlayerControlsSection(isTwoPane = false)
                     }
-                }
-                IconButton(onClick = app.player::next, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        Icons.Rounded.SkipNext,
-                        contentDescription = "Следующий",
-                        tint = content,
-                        modifier = Modifier.size(36.dp),
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (state.shuffle) accent.copy(alpha = 0.16f) else Color.Transparent)
-                        .clickable(onClick = app.player::toggleShuffle),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.Shuffle,
-                        contentDescription = "Перемешать",
-                        tint = if (state.shuffle) accent else content,
-                    )
-                }
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            // ── secondary row ────────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = KwhaleSpacing.lg),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Текст",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = content,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable(onClick = onLyrics)
-                        .padding(horizontal = KwhaleSpacing.sm, vertical = KwhaleSpacing.xs),
-                )
-                IconButton(onClick = {
-                    val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
-                    runCatching { context.startActivity(intent) }
-                        .onFailure {
-                            Toast.makeText(context, "Эквалайзер недоступен", Toast.LENGTH_SHORT).show()
-                        }
-                }) {
-                    Icon(Icons.Rounded.Tune, contentDescription = "Эквалайзер", tint = content)
-                }
-                IconButton(onClick = onQueue) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.QueueMusic,
-                        contentDescription = "Очередь",
-                        tint = content,
-                    )
-                }
-                IconButton(onClick = {
-                    track.remoteId?.let { id ->
-                        scope.launch {
-                            runCatching { app.api.track(id) }.onSuccess(onMenu)
-                        }
-                    }
-                }) {
-                    Icon(Icons.Rounded.MoreVert, contentDescription = "Ещё", tint = content)
                 }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(horizontal = KwhaleSpacing.md, vertical = KwhaleSpacing.sm),
+        )
     }
 }
 
@@ -497,6 +809,25 @@ private fun EqualizerIndicator(
     modifier: Modifier = Modifier,
     bars: Int = 3,
 ) {
+    val reducedMotion = rememberReducedMotionEnabled()
+    if (reducedMotion) {
+        val staticFractions = remember(bars) { List(bars) { i -> if (i % 2 == 0) 0.55f else 0.9f } }
+        Row(
+            modifier = modifier.height(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            staticFractions.forEach { f ->
+                Box(
+                    Modifier
+                        .width(2.5.dp)
+                        .height((12f * f).dp)
+                        .background(color, RoundedCornerShape(2.dp)),
+                )
+            }
+        }
+        return
+    }
     val transition = rememberInfiniteTransition(label = "eq")
     Row(
         modifier = modifier.height(12.dp),
@@ -510,7 +841,7 @@ private fun EqualizerIndicator(
                 animationSpec = infiniteRepeatable(
                     animation = tween(
                         durationMillis = 420 + index * 130,
-                        easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                        easing = FastOutSlowInEasing,
                     ),
                     repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
                 ),
@@ -570,7 +901,8 @@ private fun formatVkTime(ms: Long): String {
     return "%02d:%02d".format(total / 60, total % 60)
 }
 
-private fun shareTrack(context: android.content.Context, track: org.dueattendant149.kwhale.model.Track) {
+private fun shareTrack(app: KwhaleApp, context: android.content.Context, track: org.dueattendant149.kwhale.model.Track) {
+    app.events.share(track, "player")
     val text = buildString {
         append(track.artist)
         append(" — ")

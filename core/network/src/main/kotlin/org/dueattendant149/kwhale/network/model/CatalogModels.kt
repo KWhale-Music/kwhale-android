@@ -23,6 +23,7 @@ data class Track(
     val previewAvailable: Boolean = false,
     val playCount: Long? = null,
     val createdAt: String? = null,
+    val isCensorshipReported: Boolean = false,
 )
 
 @Serializable
@@ -116,6 +117,20 @@ data class Suggestion(
 @Serializable
 data class Suggestions(
     val items: List<Suggestion> = emptyList(),
+)
+
+@Serializable
+data class CensorshipReportRequest(
+    val reason: String = "censored",
+    val comment: String? = null,
+    val positionMs: Long? = null,
+)
+
+@Serializable
+data class CensorshipReportResponse(
+    val ok: Boolean = true,
+    val reportId: String = "",
+    val status: String = "pending",
 )
 
 @Serializable

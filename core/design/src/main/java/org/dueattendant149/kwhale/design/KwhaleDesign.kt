@@ -1,13 +1,17 @@
 package org.dueattendant149.kwhale.design
 
+import android.provider.Settings
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
@@ -36,13 +40,28 @@ object KwhaleSpacing {
     /** Cover thumbnail inside a list row. */
     val cover = 48.dp
 
-    /** Extra bottom space a scroll list needs for the floating player. */
-    val miniPlayer = 72.dp
+    /** Extra bottom space a scroll list needs for the floating player (~78 dp + clearance). */
+    val miniPlayer = 84.dp
     val navBar = 80.dp
 }
 
-/** Extra bottom padding scroll lists should reserve for the floating mini-player. */
+/** Extra bottom padding scroll lists should reserve for the floating mini-player / nav bars. */
 val LocalMiniPlayerBottomPadding = staticCompositionLocalOf { 0.dp }
+
+/** Checks Android developer/accessibility setting to disable non-essential infinite animations. */
+@Composable
+fun rememberReducedMotionEnabled(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        runCatching {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            ) == 0f
+        }.getOrDefault(false)
+    }
+}
 
 /** Spring-based motion (M3 Expressive). Replaces one-off tween durations. */
 object KwhaleMotion {

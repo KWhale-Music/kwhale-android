@@ -6,10 +6,12 @@ import android.net.Uri
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -109,7 +111,7 @@ class Media3Player(
 
         override fun onPlayerError(error: PlaybackException) {
             Log.e("KWhale", "playback error: ${error.errorCodeName}", error)
-            _playbackError.value = error.errorCodeName
+            _playbackError.value = readablePlaybackError(error)
             val ctrl = controller
             val track = queue.getOrNull(ctrl?.currentMediaItemIndex ?: -1)
             val key = track?.let { it.remoteId ?: it.id.toString() }
@@ -185,6 +187,36 @@ class Media3Player(
         current.prepare()
         current.play()
         queue.getOrNull(safeIndex)?.let { events.play(it, currentSurface) }
+        publish()
+    }
+
+    /** Insert [track] right after the currently playing item (or start playback if idle). */
+    fun playNext(track: Track, surface: String = "player") {
+        val current = controller
+        if (queue.isEmpty() || current == null) {
+            playQueue(listOf(track), 0, surface)
+            return
+        }
+        val insertIndex = (current.currentMediaItemIndex + 1).coerceIn(0, queue.size)
+        val mutable = queue.toMutableList()
+        mutable.add(insertIndex, track)
+        queue = mutable
+        current.addMediaItem(insertIndex, mediaItemFor(track))
+        publish()
+    }
+
+    fun clearError() {
+        _playbackError.value = null
+    }
+
+    fun retryCurrent() {
+        val current = controller ?: return
+        _playbackError.value = null
+        playRequestedAt = SystemClock.elapsedRealtime()
+        loggedReadyKey = null
+        retriedErrorKey = null
+        current.prepare()
+        current.play()
         publish()
     }
 
@@ -312,9 +344,13 @@ class Media3Player(
 
     fun toggleRepeat() {
         val current = controller ?: return
-        val enableRepeat = current.repeatMode != Player.REPEAT_MODE_ONE
-        current.repeatMode = if (enableRepeat) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-        if (enableRepeat) {
+        val nextMode = when (current.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+        current.repeatMode = nextMode
+        if (nextMode != Player.REPEAT_MODE_OFF) {
             queue.getOrNull(current.currentMediaItemIndex)?.let {
                 events.repeat(it, currentSurface, current.currentPosition.coerceAtLeast(0L))
             }
@@ -345,17 +381,37 @@ class Media3Player(
         val duration = current.duration.takeIf { it > 0L }
             ?: queue.getOrNull(current.currentMediaItemIndex)?.let { it.durationSec * 1000L }
             ?: 0L
+        val mappedRepeat = when (current.repeatMode) {
+            Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+            Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+            else -> RepeatMode.OFF
+        }
         _state.value = PlaybackState(
             queue = queue,
             index = current.currentMediaItemIndex.coerceIn(0, queue.lastIndex),
             isPlaying = current.isPlaying,
+            isBuffering = current.playbackState == Player.STATE_BUFFERING,
             positionMs = current.currentPosition.coerceAtLeast(0L),
             shuffle = current.shuffleModeEnabled,
-            repeat = current.repeatMode == Player.REPEAT_MODE_ONE,
+            repeatMode = mappedRepeat,
             durationMs = duration,
         )
     }
 
+    private fun readablePlaybackError(error: PlaybackException): String = when (error.errorCode) {
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+        -> "Нет связи с сервером"
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+        PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+        -> "Аудиопоток сейчас недоступен"
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FAILED,
+        -> "Не удалось декодировать аудиофайл"
+        else -> "Ошибка воспроизведения (${error.errorCodeName})"
+    }
+
+    @OptIn(UnstableApi::class)
     private fun mediaItemFor(track: Track): MediaItem {
         val metadata = MediaMetadata.Builder()
             .setTitle(track.title)

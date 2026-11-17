@@ -1,9 +1,9 @@
 package org.dueattendant149.kwhale.ui
 
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
@@ -16,35 +16,32 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -52,7 +49,6 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -62,8 +58,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -79,10 +80,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -92,18 +96,18 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.data.toUi
-import org.dueattendant149.kwhale.design.KwhaleAccents
+import org.dueattendant149.kwhale.design.KwhaleMotion
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
-import org.dueattendant149.kwhale.design.KwhaleMotion
 import org.dueattendant149.kwhale.design.LocalMiniPlayerBottomPadding
+import org.dueattendant149.kwhale.design.rememberReducedMotionEnabled
 import org.dueattendant149.kwhale.download.Downloads
 import org.dueattendant149.kwhale.model.Track as UiTrack
-import org.dueattendant149.kwhale.network.model.Album
-import org.dueattendant149.kwhale.network.model.Artist
 import org.dueattendant149.kwhale.network.model.Playlist
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.ui.components.CoverArt
+import org.dueattendant149.kwhale.ui.components.ErrorState
+import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
 import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.components.imageUrl
 import org.dueattendant149.kwhale.ui.screens.AppearanceScreen
@@ -153,6 +157,30 @@ fun KwhaleRoot(
     val showNav = route in tabRoutes
     val showMini = playerState.current != null
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val playerSnackbarHostState = remember { SnackbarHostState() }
+
+    fun showMessage(msg: String) {
+        val host = if (showPlayer && playerState.current != null) playerSnackbarHostState else snackbarHostState
+        scope.launch {
+            host.showSnackbar(msg, duration = SnackbarDuration.Short)
+        }
+    }
+
+    var miniTrack by remember { mutableStateOf(playerState.current) }
+    val miniVisible = remember { MutableTransitionState(showMini) }
+    LaunchedEffect(playerState.current) {
+        if (playerState.current != null) {
+            miniTrack = playerState.current
+        }
+        miniVisible.targetState = showMini
+    }
+    LaunchedEffect(miniVisible.currentState, miniVisible.targetState, showMini) {
+        if (!showMini && !miniVisible.currentState && !miniVisible.targetState) {
+            miniTrack = null
+        }
+    }
+
     LaunchedEffect(playerState.current) {
         if (playerState.current == null) showPlayer = false
     }
@@ -169,95 +197,173 @@ fun KwhaleRoot(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        CompositionLocalProvider(
-            LocalMiniPlayerBottomPadding provides if (showMini) KwhaleSpacing.miniPlayer else 0.dp,
+    val configuration = LocalConfiguration.current
+    val useRail = configuration.screenWidthDp >= 600
+    val hasBottomBar = showNav && !useRail
+    val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val miniBottomPadding = (if (hasBottomBar) 0.dp else navBarInset) +
+        (if (showMini) KwhaleSpacing.miniPlayer else 0.dp)
+    val reducedMotion = rememberReducedMotionEnabled()
+
+    Row(Modifier.fillMaxSize()) {
+        if (useRail && showNav) {
+            NavigationRail(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+                Spacer(Modifier.statusBarsPadding().height(KwhaleSpacing.md))
+                NavigationRailItem(
+                    selected = route == "home",
+                    onClick = { navController.navigateTop("home") },
+                    icon = { Icon(Icons.Rounded.Home, null) },
+                    label = { Text("Главная") },
+                )
+                NavigationRailItem(
+                    selected = route == "search",
+                    onClick = { navController.navigateTop("search") },
+                    icon = { Icon(Icons.Rounded.Search, null) },
+                    label = { Text("Поиск") },
+                )
+                NavigationRailItem(
+                    selected = route == "library",
+                    onClick = { navController.navigateTop("library") },
+                    icon = { Icon(Icons.Rounded.LibraryMusic, null) },
+                    label = { Text("Библиотека") },
+                )
+                NavigationRailItem(
+                    selected = route == "profile",
+                    onClick = { navController.navigateTop("profile") },
+                    icon = { Icon(Icons.Rounded.Person, null) },
+                    label = { Text("Профиль") },
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxSize(),
         ) {
-            Scaffold(
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                bottomBar = {
-                    if (showNav) {
-                        NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-                            NavigationBarItem(
-                                selected = route == "home",
-                                onClick = { navController.navigateTop("home") },
-                                icon = { Icon(Icons.Rounded.Home, null) },
-                                label = { Text("Главная") },
-                            )
-                            NavigationBarItem(
-                                selected = route == "search",
-                                onClick = { navController.navigateTop("search") },
-                                icon = { Icon(Icons.Rounded.Search, null) },
-                                label = { Text("Поиск") },
-                            )
-                            NavigationBarItem(
-                                selected = route == "library",
-                                onClick = { navController.navigateTop("library") },
-                                icon = { Icon(Icons.Rounded.LibraryMusic, null) },
-                                label = { Text("Библиотека") },
-                            )
-                            NavigationBarItem(
-                                selected = route == "profile",
-                                onClick = { navController.navigateTop("profile") },
-                                icon = { Icon(Icons.Rounded.Person, null) },
-                                label = { Text("Профиль") },
-                            )
+            CompositionLocalProvider(
+                LocalMiniPlayerBottomPadding provides miniBottomPadding,
+                LocalSnackbarHost provides snackbarHostState,
+            ) {
+                Scaffold(
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    snackbarHost = {
+                        SnackbarHost(
+                            hostState = snackbarHostState,
+                            modifier = Modifier.padding(bottom = miniBottomPadding),
+                        )
+                    },
+                    bottomBar = {
+                        if (hasBottomBar) {
+                            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                                NavigationBarItem(
+                                    selected = route == "home",
+                                    onClick = { navController.navigateTop("home") },
+                                    icon = { Icon(Icons.Rounded.Home, null) },
+                                    label = { Text("Главная") },
+                                )
+                                NavigationBarItem(
+                                    selected = route == "search",
+                                    onClick = { navController.navigateTop("search") },
+                                    icon = { Icon(Icons.Rounded.Search, null) },
+                                    label = { Text("Поиск") },
+                                )
+                                NavigationBarItem(
+                                    selected = route == "library",
+                                    onClick = { navController.navigateTop("library") },
+                                    icon = { Icon(Icons.Rounded.LibraryMusic, null) },
+                                    label = { Text("Библиотека") },
+                                )
+                                NavigationBarItem(
+                                    selected = route == "profile",
+                                    onClick = { navController.navigateTop("profile") },
+                                    icon = { Icon(Icons.Rounded.Person, null) },
+                                    label = { Text("Профиль") },
+                                )
+                            }
                         }
+                    },
+                ) { innerPadding ->
+                    // Two different motions:
+                    //  * tab → tab: fade-through (quick exit, calm enter), no slide/scale;
+                    //  * tab → detail: a short horizontal push so hierarchy is obvious.
+                    fun isTab(entry: androidx.navigation.NavBackStackEntry?): Boolean =
+                        entry?.destination?.route?.let { it in tabRoutes } == true
+
+                    val calmEnter = fadeIn(
+                        tween(KwhaleMotion.durationStd, easing = KwhaleMotion.emphasizedDecelerate),
+                    )
+                    val quickExit = fadeOut(
+                        tween(KwhaleMotion.durationFast, easing = KwhaleMotion.emphasizedAccelerate),
+                    )
+                    val pushEnter = if (reducedMotion) {
+                        calmEnter
+                    } else {
+                        slideInHorizontally(
+                            animationSpec = tween(
+                                KwhaleMotion.durationEmphasized,
+                                easing = KwhaleMotion.emphasizedDecelerate,
+                            ),
+                            initialOffsetX = { it / 10 },
+                        ) + calmEnter
                     }
-                },
-            ) { innerPadding ->
-        // Two different motions:
-        //  * tab → tab: fade-through (quick exit, calm enter), no slide/scale;
-        //  * tab → detail: a short horizontal push so hierarchy is obvious.
-        fun isTab(entry: androidx.navigation.NavBackStackEntry?): Boolean =
-            entry?.destination?.route?.let { it in tabRoutes } == true
+                    val pushExit = if (reducedMotion) {
+                        quickExit
+                    } else {
+                        slideOutHorizontally(
+                            animationSpec = tween(
+                                KwhaleMotion.durationFast,
+                                easing = KwhaleMotion.emphasizedAccelerate,
+                            ),
+                            targetOffsetX = { it / 14 },
+                        ) + quickExit
+                    }
+                    val popEnter = if (reducedMotion) {
+                        calmEnter
+                    } else {
+                        slideInHorizontally(
+                            animationSpec = tween(
+                                KwhaleMotion.durationStd,
+                                easing = KwhaleMotion.emphasizedDecelerate,
+                            ),
+                            initialOffsetX = { -it / 10 },
+                        ) + calmEnter
+                    }
+                    val popExit = if (reducedMotion) {
+                        quickExit
+                    } else {
+                        slideOutHorizontally(
+                            animationSpec = tween(
+                                KwhaleMotion.durationFast,
+                                easing = KwhaleMotion.emphasizedAccelerate,
+                            ),
+                            targetOffsetX = { it / 10 },
+                        ) + quickExit
+                    }
 
-        val calmEnter = fadeIn(
-            tween(KwhaleMotion.durationStd, easing = KwhaleMotion.emphasizedDecelerate),
-        )
-        val quickExit = fadeOut(
-            tween(KwhaleMotion.durationFast, easing = KwhaleMotion.emphasizedAccelerate),
-        )
-        val pushEnter = slideInHorizontally(
-            animationSpec = tween(
-                KwhaleMotion.durationEmphasized,
-                easing = KwhaleMotion.emphasizedDecelerate,
-            ),
-            initialOffsetX = { it / 10 },
-        ) + calmEnter
-        val pushExit = slideOutHorizontally(
-            animationSpec = tween(KwhaleMotion.durationFast, easing = KwhaleMotion.emphasizedAccelerate),
-            targetOffsetX = { it / 14 },
-        ) + quickExit
-        val popEnter = slideInHorizontally(
-            animationSpec = tween(
-                KwhaleMotion.durationStd,
-                easing = KwhaleMotion.emphasizedDecelerate,
-            ),
-            initialOffsetX = { -it / 10 },
-        ) + calmEnter
-        val popExit = slideOutHorizontally(
-            animationSpec = tween(KwhaleMotion.durationFast, easing = KwhaleMotion.emphasizedAccelerate),
-            targetOffsetX = { it / 10 },
-        ) + quickExit
-
-        NavHost(
-            navController = navController,
-            startDestination = "home",
-            modifier = Modifier.padding(innerPadding),
-            enterTransition = {
-                if (isTab(initialState) && isTab(targetState)) calmEnter else pushEnter
-            },
-            exitTransition = {
-                if (isTab(initialState) && isTab(targetState)) quickExit else pushExit
-            },
-            popEnterTransition = {
-                if (isTab(initialState) && isTab(targetState)) calmEnter else popEnter
-            },
-            popExitTransition = {
-                if (isTab(initialState) && isTab(targetState)) quickExit else popExit
-            },
-        ) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = "home",
+                        modifier = Modifier.padding(innerPadding),
+                        enterTransition = {
+                            if (reducedMotion) EnterTransition.None
+                            else if (isTab(initialState) && isTab(targetState)) calmEnter else pushEnter
+                        },
+                        exitTransition = {
+                            if (reducedMotion) ExitTransition.None
+                            else if (isTab(initialState) && isTab(targetState)) quickExit else pushExit
+                        },
+                        popEnterTransition = {
+                            if (reducedMotion) EnterTransition.None
+                            else if (isTab(initialState) && isTab(targetState)) calmEnter else popEnter
+                        },
+                        popExitTransition = {
+                            if (reducedMotion) ExitTransition.None
+                            else if (isTab(initialState) && isTab(targetState)) quickExit else popExit
+                        },
+                    ) {
             composable("home") {
                 HomeScreen(
                     app = app,
@@ -268,6 +374,8 @@ fun KwhaleRoot(
                     },
                     onTrackMenu = { menuTrack = it },
                     onOpenProfile = { navController.navigateTop("profile") },
+                    onOpenCollection = { kind, id -> navController.navigate("collection/$kind/$id") },
+                    onDownloads = { navController.navigate("downloads") },
                 )
             }
             composable("search") {
@@ -299,6 +407,7 @@ fun KwhaleRoot(
             }
             composable("settings") {
                 SettingsScreen(
+                    app = app,
                     onBack = { navController.popBackStack() },
                     onAppearance = { navController.navigate("appearance") },
                     onDownloads = { navController.navigate("downloads") },
@@ -335,6 +444,7 @@ fun KwhaleRoot(
                     kind = entry.arguments?.getString("kind").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onOpenCollection = { kind, id -> navController.navigate("collection/$kind/$id") },
+                    onTrackMenu = { menuTrack = it },
                 )
             }
             composable("collection/{kind}/{id}") { entry ->
@@ -375,23 +485,22 @@ fun KwhaleRoot(
         }
         }
         }
-        if (showMini) {
-            val navBarInset = WindowInsets.navigationBars
-                .asPaddingValues()
-                .calculateBottomPadding()
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(
                         bottom = navBarInset +
-                            (if (showNav) KwhaleSpacing.navBar else 0.dp) +
+                            (if (hasBottomBar) KwhaleSpacing.navBar else 0.dp) +
                             KwhaleSpacing.xs,
                     ),
             ) {
                 MiniPlayer(
-                    track = playerState.current,
+                    visible = miniVisible,
+                    track = miniTrack,
                     isPlaying = playerState.isPlaying,
+                    isBuffering = playerState.isBuffering,
                     progress = playerState.progress,
+                    reducedMotion = reducedMotion,
                     onOpen = { showPlayer = true },
                     onToggle = app.player::toggle,
                     onNext = app.player::next,
@@ -404,6 +513,7 @@ fun KwhaleRoot(
         ModalBottomSheet(
             onDismissRequest = { showPlayer = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetMaxWidth = Dp.Unspecified,
             containerColor = Color.Transparent,
             dragHandle = null,
             contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
@@ -411,12 +521,13 @@ fun KwhaleRoot(
             PlayerScreen(
                 app = app,
                 state = playerState,
+                snackbarHostState = playerSnackbarHostState,
                 onClose = { showPlayer = false },
                 onOpenArtist = { id -> showPlayer = false; navController.navigate("collection/artist/$id") },
                 onOpenAlbum = { id -> showPlayer = false; navController.navigate("collection/album/$id") },
                 onLyrics = { showLyrics = true },
                 onQueue = { showQueue = true },
-                onMenu = { showPlayer = false; menuTrack = it },
+                onMenu = { menuTrack = it },
             )
         }
     }
@@ -460,15 +571,24 @@ fun KwhaleRoot(
                     addToPlaylistTrack = track
                     menuTrack = null
                 },
-                onOpenArtist = { id -> menuTrack = null; navController.navigate("collection/artist/$id") },
-                onOpenAlbum = { id -> menuTrack = null; navController.navigate("collection/album/$id") },
-                onShare = { shareTrack(context, track) },
+                onOpenArtist = { id ->
+                    menuTrack = null
+                    showPlayer = false
+                    navController.navigate("collection/artist/$id")
+                },
+                onOpenAlbum = { id ->
+                    menuTrack = null
+                    showPlayer = false
+                    navController.navigate("collection/album/$id")
+                },
+                onShare = { shareTrack(app, context, track) },
                 onDownload = {
                     val ui = track.toUi(app.api)
                     Downloads.enqueue(context, ui)
-                    Toast.makeText(context, "Скачивание начато", Toast.LENGTH_SHORT).show()
+                    showMessage("Скачивание начато")
                     menuTrack = null
                 },
+                onMessage = ::showMessage,
             )
         }
     }
@@ -482,7 +602,10 @@ fun KwhaleRoot(
                 app = app,
                 track = track,
                 onDismiss = { addToPlaylistTrack = null },
-                onDone = { addToPlaylistTrack = null },
+                onDone = {
+                    showMessage("Добавлено в плейлист")
+                    addToPlaylistTrack = null
+                },
             )
         }
     }
@@ -490,14 +613,17 @@ fun KwhaleRoot(
 
 @Composable
 private fun MiniPlayer(
+    visible: MutableTransitionState<Boolean>,
     track: UiTrack?,
     isPlaying: Boolean,
+    isBuffering: Boolean,
     progress: Float,
+    reducedMotion: Boolean,
     onOpen: () -> Unit,
     onToggle: () -> Unit,
     onNext: () -> Unit,
 ) {
-    if (track == null) return
+    val displayTrack = track ?: return
 
     // The player emits progress once per second; animate between ticks so the
     // hairline does not visibly jump.
@@ -507,24 +633,34 @@ private fun MiniPlayer(
         label = "miniProgress",
     )
 
-    // Slides in when a queue starts instead of popping into place.
-    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
     AnimatedVisibility(
         visibleState = visible,
-        enter = slideInVertically(
-            initialOffsetY = { it },
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioLowBouncy,
-                stiffness = Spring.StiffnessMediumLow,
-            ),
-        ) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        enter = if (reducedMotion) {
+            fadeIn()
+        } else {
+            slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            ) + fadeIn()
+        },
+        exit = if (reducedMotion) {
+            fadeOut()
+        } else {
+            slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        },
     ) {
         Surface(
             modifier = Modifier
+                .widthIn(max = 640.dp)
                 .fillMaxWidth()
                 .padding(horizontal = KwhaleSpacing.xs, vertical = KwhaleSpacing.xxs)
-                .clickable(onClick = onOpen),
+                .semantics {
+                    contentDescription = "Открыть плеер: ${displayTrack.title}, ${displayTrack.artist}"
+                }
+                .clickable(onClickLabel = "Открыть плеер", onClick = onOpen),
             shape = RoundedCornerShape(28.dp),
             // Floating over content, not in a bottom bar. Keep the capsule in
             // the theme's surface family: a border + shadow separates it from
@@ -538,14 +674,24 @@ private fun MiniPlayer(
             shadowElevation = 8.dp,
         ) {
             Column {
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.Transparent,
-                )
+                if (isBuffering) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = Color.Transparent,
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = Color.Transparent,
+                    )
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth(),
@@ -553,7 +699,7 @@ private fun MiniPlayer(
                 ) {
                     // content below is unchanged except spacing tokens
                     MiniPlayerContent(
-                        track = track,
+                        track = displayTrack,
                         isPlaying = isPlaying,
                         onToggle = onToggle,
                         onNext = onNext,
@@ -621,16 +767,33 @@ private fun AddToPlaylistSheet(
     onDismiss: () -> Unit,
     onDone: () -> Unit,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+    var actionError by remember { mutableStateOf<String?>(null) }
     var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
 
+    fun loadPlaylists() {
+        loading = true
+        loadError = null
+        scope.launch {
+            runCatching { app.api.playlists(limit = 100).items }
+                .onSuccess {
+                    playlists = it
+                    loading = false
+                }
+                .onFailure {
+                    loadError = "Не удалось загрузить плейлисты"
+                    loading = false
+                }
+        }
+    }
+
     LaunchedEffect(Unit) {
-        playlists = runCatching { app.api.playlists(limit = 100).items }.getOrDefault(emptyList())
-        loading = false
+        loadPlaylists()
     }
 
     Column(
@@ -643,52 +806,74 @@ private fun AddToPlaylistSheet(
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         )
-        if (loading) {
-            Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp),
-            ) {
-                itemsIndexed(playlists, key = { _, p -> p.id }) { _, playlist ->
-                    ListItem(
-                        headlineContent = { Text(playlist.title) },
-                        supportingContent = { Text(KwhalePlural.tracks(playlist.trackCount)) },
-                        leadingContent = {
-                            CoverArt(
-                                imageUrl = playlist.imageUrl(app.api),
-                                modifier = Modifier.size(44.dp),
-                                shape = RoundedCornerShape(8.dp),
-                            )
-                        },
-                        trailingContent = {
-                            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        modifier = Modifier.clickable {
-                            scope.launch {
-                                runCatching { app.api.addPlaylistTracks(playlist.id, listOf(track.id)) }
-                                    .onSuccess {
-                                        Toast.makeText(context, "Добавлено в плейлист", Toast.LENGTH_SHORT).show()
-                                        onDone()
-                                    }
-                                    .onFailure {
-                                        Toast.makeText(context, "Не удалось добавить в плейлист", Toast.LENGTH_SHORT).show()
-                                    }
-                            }
-                        },
-                    )
+        actionError?.let { msg ->
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+        }
+        when {
+            loading -> {
+                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
-                item {
-                    ListItem(
-                        headlineContent = { Text("Новый плейлист") },
-                        leadingContent = { Icon(Icons.Rounded.Add, null) },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        modifier = Modifier.clickable { showCreate = true },
-                    )
+            }
+            loadError != null -> {
+                ErrorState(
+                    message = loadError ?: "Ошибка загрузки",
+                    onRetry = { loadPlaylists() },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                )
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp),
+                ) {
+                    itemsIndexed(playlists, key = { _, p -> p.id }) { _, playlist ->
+                        ListItem(
+                            headlineContent = { Text(playlist.title) },
+                            supportingContent = { Text(KwhalePlural.tracks(playlist.trackCount)) },
+                            leadingContent = {
+                                CoverArt(
+                                    imageUrl = playlist.imageUrl(app.api),
+                                    modifier = Modifier.size(44.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                )
+                            },
+                            trailingContent = {
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            modifier = Modifier.clickable(enabled = !saving) {
+                                saving = true
+                                actionError = null
+                                scope.launch {
+                                    runCatching { app.api.addPlaylistTracks(playlist.id, listOf(track.id)) }
+                                        .onSuccess {
+                                            app.events.playlistAdd(track.toUi(app.api), playlist.id, "track_menu")
+                                            saving = false
+                                            onDone()
+                                        }
+                                        .onFailure {
+                                            saving = false
+                                            actionError = "Не удалось добавить в плейлист"
+                                        }
+                                }
+                            },
+                        )
+                    }
+                    item {
+                        ListItem(
+                            headlineContent = { Text("Новый плейлист") },
+                            leadingContent = { Icon(Icons.Rounded.Add, null) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            modifier = Modifier.clickable(enabled = !saving) { showCreate = true },
+                        )
+                    }
                 }
             }
         }
@@ -696,44 +881,71 @@ private fun AddToPlaylistSheet(
 
     if (showCreate) {
         androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showCreate = false },
+            onDismissRequest = { if (!saving) showCreate = false },
             title = { Text("Новый плейлист") },
             text = {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    singleLine = true,
-                    label = { Text("Название") },
-                )
+                Column {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        singleLine = true,
+                        enabled = !saving,
+                        label = { Text("Название") },
+                    )
+                    actionError?.let { msg ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
+                    enabled = !saving && newName.trim().isNotEmpty(),
                     onClick = {
                         val name = newName.trim()
                         if (name.isNotEmpty()) {
+                            saving = true
+                            actionError = null
                             scope.launch {
                                 runCatching {
                                     val created = app.api.createPlaylist(
                                         org.dueattendant149.kwhale.network.model.PlaylistCreate(name),
                                     )
                                     app.api.addPlaylistTracks(created.id, listOf(track.id))
+                                    created.id
+                                }.onSuccess { createdId ->
+                                    app.events.playlistAdd(track.toUi(app.api), createdId, "track_menu")
+                                    saving = false
+                                    showCreate = false
+                                    onDone()
+                                }.onFailure {
+                                    saving = false
+                                    actionError = "Не удалось создать плейлист"
                                 }
-                                showCreate = false
-                                Toast.makeText(context, "Добавлено в плейлист", Toast.LENGTH_SHORT).show()
-                                onDone()
                             }
                         }
                     },
-                ) { Text("Создать") }
+                ) {
+                    if (saving) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Создать")
+                    }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showCreate = false }) { Text("Отмена") }
+                TextButton(enabled = !saving, onClick = { showCreate = false }) { Text("Отмена") }
             },
         )
     }
 }
 
-private fun shareTrack(context: android.content.Context, track: ApiTrack) {
+private fun shareTrack(app: KwhaleApp, context: android.content.Context, track: ApiTrack) {
+    app.events.share(track.toUi(app.api), "track_menu")
     val text = buildString {
         append(track.artistLine())
         append(" — ")
