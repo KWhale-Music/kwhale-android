@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SecondaryTabRow
@@ -48,6 +50,8 @@ import org.dueattendant149.kwhale.ui.components.ErrorState
 import org.dueattendant149.kwhale.ui.components.LocalSnackbarHost
 import org.dueattendant149.kwhale.ui.components.TrackRow
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
+import org.dueattendant149.kwhale.ui.components.isSingleLike
+import org.dueattendant149.kwhale.ui.components.primaryArtistId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +86,7 @@ fun ArtistAllScreen(
             )
         }
         if (tab == 0) {
-            ArtistTracks(app, artistId, onTrackMenu)
+            ArtistTracks(app, artistId, onTrackMenu, onOpenCollection)
         } else {
             ArtistAlbums(app, artistId, onOpenCollection)
         }
@@ -94,6 +98,7 @@ private fun ArtistTracks(
     app: KwhaleApp,
     artistId: String,
     onTrackMenu: (ApiTrack) -> Unit,
+    onOpenCollection: (String, String) -> Unit,
 ) {
     var items by remember { mutableStateOf<List<ApiTrack>>(emptyList()) }
     var next by remember { mutableStateOf<String?>(null) }
@@ -208,6 +213,11 @@ private fun ArtistTracks(
                     )
                 },
                 onOverflow = { onTrackMenu(track) },
+                onArtistClick = {
+                    track.primaryArtistId()
+                        ?.takeIf { it != artistId }
+                        ?.let { id -> onOpenCollection("artist", id) }
+                },
             )
         }
         if (next != null) {
@@ -236,6 +246,7 @@ private fun ArtistAlbums(
     var loadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableStateOf(0) }
+    var typeFilter by remember { mutableStateOf("all") }
     val snackbarHost = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
@@ -330,7 +341,27 @@ private fun ArtistAlbums(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(items, key = { it.id }) { album ->
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("all" to "Все", "album" to "Альбомы", "single" to "Синглы и EP").forEach { (key, label) ->
+                    FilterChip(
+                        selected = typeFilter == key,
+                        onClick = { typeFilter = key },
+                        label = { Text(label) },
+                    )
+                }
+            }
+        }
+        items(
+            items.filter { album ->
+                when (typeFilter) {
+                    "album" -> !isSingleLike(album)
+                    "single" -> isSingleLike(album)
+                    else -> true
+                }
+            },
+            key = { it.id },
+        ) { album ->
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center,
@@ -340,6 +371,11 @@ private fun ArtistAlbums(
                     api = app.api,
                     onClick = { onOpenCollection("album", album.id) },
                     width = 152,
+                    onArtistClick = {
+                        album.primaryArtistId()
+                            ?.takeIf { it != artistId }
+                            ?.let { id -> onOpenCollection("artist", id) }
+                    },
                 )
             }
         }

@@ -107,6 +107,8 @@ import org.dueattendant149.kwhale.ui.components.SectionHeader
 import org.dueattendant149.kwhale.ui.components.ShimmerBox
 import org.dueattendant149.kwhale.ui.components.TrackRow
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
+import org.dueattendant149.kwhale.ui.components.isSingleLike
+import org.dueattendant149.kwhale.ui.components.primaryArtistId
 import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.components.imageUrl
 import java.io.File
@@ -168,7 +170,9 @@ fun CollectionScreen(
         }
     }
     val displayTracks = if (kind == "artist") tracks.take(5) else tracks
-    val displayAlbums = if (kind == "artist") albums.take(5) else albums
+    // Singles/EPs get their own shelf — the «не отличить сингл от альбома» feedback.
+    val fullAlbums = albums.filterNot { isSingleLike(it) }
+    val singlesAndEps = albums.filter { isSingleLike(it) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -791,6 +795,11 @@ fun CollectionScreen(
                             },
                             onOverflow = { onTrackMenu(track) },
                             number = index + 1,
+                            onArtistClick = {
+                                track.primaryArtistId()
+                                    ?.takeIf { kind != "artist" || it != collectionId }
+                                    ?.let { onOpenCollection("artist", it) }
+                            },
                         )
                     }
                     if (albums.isNotEmpty() || kind == "artist") {
@@ -805,14 +814,48 @@ fun CollectionScreen(
                                 },
                             )
                         }
-                        if (albums.isNotEmpty()) {
+                        if (fullAlbums.isNotEmpty()) {
                             item {
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(displayAlbums, key = { it.id }) { album ->
+                                    items(fullAlbums.take(5), key = { it.id }) { album ->
                                         AlbumCard(
                                             album = album,
                                             api = app.api,
                                             onClick = { onOpenCollection("album", album.id) },
+                                            onArtistClick = {
+                                                album.primaryArtistId()
+                                                    ?.takeIf { kind != "artist" || it != collectionId }
+                                                    ?.let { id -> onOpenCollection("artist", id) }
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (singlesAndEps.isNotEmpty()) {
+                            item {
+                                SectionHeader(
+                                    title = "Синглы и EP",
+                                    action = if (kind == "artist") "Все" else null,
+                                    onAction = if (kind == "artist") {
+                                        { onOpenArtistAll("albums") }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
+                            item {
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    items(singlesAndEps.take(5), key = { it.id }) { album ->
+                                        AlbumCard(
+                                            album = album,
+                                            api = app.api,
+                                            onClick = { onOpenCollection("album", album.id) },
+                                            onArtistClick = {
+                                                album.primaryArtistId()
+                                                    ?.takeIf { kind != "artist" || it != collectionId }
+                                                    ?.let { id -> onOpenCollection("artist", id) }
+                                            },
                                         )
                                     }
                                 }

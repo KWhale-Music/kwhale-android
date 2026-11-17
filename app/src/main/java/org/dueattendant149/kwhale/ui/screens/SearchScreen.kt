@@ -1,6 +1,8 @@
 package org.dueattendant149.kwhale.ui.screens
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -72,6 +75,8 @@ import org.dueattendant149.kwhale.ui.components.TrackRow
 import org.dueattendant149.kwhale.ui.components.TrackRowSkeleton
 import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.components.imageUrl
+import org.dueattendant149.kwhale.ui.components.isSingleLike
+import org.dueattendant149.kwhale.ui.components.primaryArtistId
 
 private val searchTypes = listOf(
     "all" to "Всё",
@@ -88,9 +93,13 @@ fun SearchScreen(
     onTrackMenu: (ApiTrack) -> Unit,
 ) {
     val cached = remember { app.cache.read(ContentCache.SEARCH_BOOTSTRAP, SearchBootstrapSnapshot.serializer()) }
-    var query by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf("all") }
-    var results by remember { mutableStateOf<SearchResponse?>(null) }
+    // Query/results live in the app-scoped session so returning from an artist
+    // page restores the previous search instead of an empty screen.
+    val session = app.searchSession
+    var query by remember { session.query }
+    var selectedType by remember { session.selectedType }
+    var results by remember { session.results }
+    var albumFilter by remember { mutableStateOf("all") }
     var suggestions by remember { mutableStateOf<List<Suggestion>>(emptyList()) }
     var history by remember { mutableStateOf(cached?.history.orEmpty()) }
     var genres by remember { mutableStateOf(cached?.genres.orEmpty()) }
@@ -143,15 +152,21 @@ fun SearchScreen(
             refiningSlowResults = false
             return@LaunchedEffect
         }
+        val trimmed = query.trim()
+        // Back from an artist page: restored results already match this query
+        // and category — keep them, don't blank the screen into skeletons.
+        if (searchTick == 0 && results?.query == trimmed && session.resultsType.value == selectedType) {
+            return@LaunchedEffect
+        }
         delay(300)
         loading = true
         refiningSlowResults = false
         error = null
-        val trimmed = query.trim()
         try {
             // Two-wave search: show fast local hits right away, then wait for external sources.
             val quick = app.api.search(trimmed, type = selectedType, limit = 30, wait = false)
             results = quick
+            session.resultsType.value = selectedType
             app.cache.invalidateSearchBootstrap()
             loading = false
             if (quick.partial) {
@@ -387,19 +402,54 @@ fun SearchScreen(
                                             }
                                         },
                                         onOverflow = { onTrackMenu(track) },
+                                        onArtistClick = {
+                                            track.primaryArtistId()?.let { onOpenCollection("artist", it) }
+                                        },
                                     )
                                 }
                             }
                             if (albums.isNotEmpty()) {
-                                item { SectionHeader("Альбомы") }
                                 item {
-                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        items(albums) { album ->
-                                            AlbumCard(
-                                                album = album,
-                                                api = app.api,
-                                                onClick = { onOpenCollection("album", album.id) },
+                                    SectionHeader("Альбомы")
+                                }
+                                item {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf("all" to "Все", "album" to "Альбомы", "single" to "Синглы и EP").forEach { (key, label) ->
+                                            FilterChip(
+                                                selected = albumFilter == key,
+                                                onClick = { albumFilter = key },
+                                                label = { Text(label) },
                                             )
+                                        }
+                                    }
+                                }
+                                val filteredAlbums = when (albumFilter) {
+                                    "album" -> albums.filterNot { isSingleLike(it) }
+                                    "single" -> albums.filter { isSingleLike(it) }
+                                    else -> albums
+                                }
+                                if (filteredAlbums.isEmpty()) {
+                                    item {
+                                        Text(
+                                            text = "В этой категории ничего нет",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                        )
+                                    }
+                                } else {
+                                    item {
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            items(filteredAlbums) { album ->
+                                                AlbumCard(
+                                                    album = album,
+                                                    api = app.api,
+                                                    onClick = { onOpenCollection("album", album.id) },
+                                                    onArtistClick = {
+                                                        album.primaryArtistId()?.let { onOpenCollection("artist", it) }
+                                                    },
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -453,22 +503,25 @@ private fun TopResult(
                 "Артист",
                 it.imageUrl(app.api),
                 { onOpenCollection("artist", it.id) },
+                null,
             )
         }
-        "album" -> top.album?.let {
+        "album" -> top.album?.let { album ->
             Quad(
-                it.title,
-                it.artists.joinToString(", ") { artist -> artist.name },
-                it.imageUrl(app.api),
-                { onOpenCollection("album", it.id) },
+                album.title,
+                album.artists.joinToString(", ") { artist -> artist.name },
+                album.imageUrl(app.api),
+                { onOpenCollection("album", album.id) },
+                { album.primaryArtistId()?.let { id -> onOpenCollection("artist", id) } },
             )
         }
-        "track" -> top.track?.let {
+        "track" -> top.track?.let { track ->
             Quad(
-                it.title,
-                it.artistLine(),
-                it.imageUrl(app.api),
-                { app.player.playQueue(listOf(it.toUi(app.api)), 0) },
+                track.title,
+                track.artistLine(),
+                track.imageUrl(app.api),
+                { app.player.playQueue(listOf(track.toUi(app.api)), 0) },
+                { track.primaryArtistId()?.let { id -> onOpenCollection("artist", id) } },
             )
         }
         "playlist" -> top.playlist?.let {
@@ -477,11 +530,12 @@ private fun TopResult(
                 KwhalePlural.tracks(it.trackCount),
                 it.imageUrl(app.api),
                 { onOpenCollection("playlist", it.id) },
+                null,
             )
         }
         else -> null
     } ?: return
-    val (title, subtitle, cover, onClick) = result
+    val (title, subtitle, cover, onClick, onArtistClick) = result
 
     SectionHeader("Лучший результат")
     Surface(
@@ -512,9 +566,20 @@ private fun TopResult(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (onArtistClick != null) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = if (onArtistClick != null) {
+                        Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = LocalIndication.current,
+                                onClickLabel = "Открыть исполнителя",
+                                onClick = onArtistClick,
+                            )
+                    } else Modifier,
                 )
             }
         }
@@ -526,4 +591,5 @@ private data class Quad(
     val subtitle: String,
     val cover: String?,
     val onClick: () -> Unit,
+    val onArtistClick: (() -> Unit)? = null,
 )

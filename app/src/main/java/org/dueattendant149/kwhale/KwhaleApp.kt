@@ -16,6 +16,7 @@ import okhttp3.OkHttpClient
 import org.dueattendant149.kwhale.analytics.EventTracker
 import org.dueattendant149.kwhale.data.ApiReactionGateway
 import org.dueattendant149.kwhale.data.ContentCache
+import org.dueattendant149.kwhale.data.SearchSession
 import org.dueattendant149.kwhale.data.TrackReactionStore
 import org.dueattendant149.kwhale.download.DownloadObserver
 import org.dueattendant149.kwhale.download.DownloadStore
@@ -53,6 +54,8 @@ class KwhaleApp : Application() {
 
     lateinit var cache: ContentCache
         private set
+
+    val searchSession: SearchSession = SearchSession()
 
     lateinit var widgetSnapshot: PlayerSnapshotStore
         private set

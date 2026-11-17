@@ -101,6 +101,41 @@ fun formatDuration(ms: Long): String {
 fun ApiTrack.artistLine(): String =
     artists.joinToString(", ") { it.name }.ifBlank { "Неизвестный артист" }
 
+/** First real artist of a track (skip source-less "unknown-" rows). */
+fun ApiTrack.primaryArtistId(): String? =
+    artists.firstOrNull { !it.id.startsWith("unknown-") && it.name.isNotBlank() }?.id
+
+/** First real artist of an album. */
+fun Album.primaryArtistId(): String? =
+    artists.firstOrNull { !it.id.startsWith("unknown-") && it.name.isNotBlank() }?.id
+
+/**
+ * Release-type label for album cards: «Сингл» / «EP» / «Сборник» / «Концерт».
+ * Plain albums get no label — they are the default, and the label exists to
+ * make singles and EPs stand out (the «не отличить сингл от альбома» feedback).
+ */
+fun albumTypeLabel(album: Album): String? = when (album.type?.lowercase()) {
+    "single" -> "Сингл"
+    "ep" -> "EP"
+    "compilation" -> "Сборник"
+    "live" -> "Концерт"
+    "album" -> null
+    else -> when {
+        album.trackCount in 1..2 -> "Сингл"
+        album.trackCount in 3..6 -> "EP"
+        else -> null
+    }
+}
+
+/** Singles/EPs belong on their own shelf, away from full albums. */
+fun isSingleLike(album: Album): Boolean {
+    return when (album.type?.lowercase()) {
+        "single", "ep" -> true
+        "album", "compilation", "live" -> false
+        else -> album.trackCount in 1..6
+    }
+}
+
 /**
  * Cover URL helpers.
  *
@@ -410,6 +445,7 @@ fun TrackRow(
     number: Int? = null,
     showCover: Boolean = true,
     isCurrent: Boolean = false,
+    onArtistClick: (() -> Unit)? = null,
 ) {
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
     val interaction = remember { MutableInteractionSource() }
@@ -473,17 +509,39 @@ fun TrackRow(
                     }
                 }
             }
-            Text(
-                text = if (track.durationMs > 0) {
-                    "${track.artistLine()} · ${formatDuration(track.durationMs)}"
-                } else {
-                    track.artistLine()
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // The artist line is its own tap target: tapping the artist under a
+            // song must open the ARTIST page, not play / open the single.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = track.artistLine(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (onArtistClick != null) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (onArtistClick != null) {
+                        Modifier
+                            .weight(1f, fill = false)
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = LocalIndication.current,
+                                onClickLabel = "Открыть исполнителя",
+                                onClick = onArtistClick,
+                            )
+                    } else {
+                        Modifier.weight(1f, fill = false)
+                    },
+                )
+                if (track.durationMs > 0) {
+                    Text(
+                        text = " · ${formatDuration(track.durationMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
         LikeIconButton(liked = liked, onClick = onToggleLike)
         IconButton(onClick = onOverflow) {
@@ -524,6 +582,7 @@ fun TrackTile(
     modifier: Modifier = Modifier,
     isCurrent: Boolean = false,
     onMenu: (() -> Unit)? = null,
+    onArtistClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Column(
@@ -568,9 +627,20 @@ fun TrackTile(
         Text(
             text = track.artistLine(),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (onArtistClick != null) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = if (onArtistClick != null) {
+                Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = LocalIndication.current,
+                        onClickLabel = "Открыть исполнителя",
+                        onClick = onArtistClick,
+                    )
+            } else Modifier,
         )
     }
 }
@@ -582,6 +652,7 @@ fun AlbumCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     width: Int = 140,
+    onArtistClick: (() -> Unit)? = null,
 ) {
     AlbumCard(
         title = album.title,
@@ -591,6 +662,8 @@ fun AlbumCard(
         onClick = onClick,
         modifier = modifier,
         width = width,
+        badge = albumTypeLabel(album),
+        onArtistClick = onArtistClick,
     )
 }
 
@@ -604,6 +677,8 @@ fun AlbumCard(
     width: Int = 140,
     seed: String = "",
     coverTitle: String? = null,
+    badge: String? = null,
+    onArtistClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Column(
@@ -617,16 +692,32 @@ fun AlbumCard(
                 onClick = onClick,
             ),
     ) {
-        CoverArt(
-            imageUrl = coverUrl,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f),
-            shape = RoundedCornerShape(10.dp),
-            iconSize = 28,
-            seed = seed.ifBlank { title },
-            titleText = coverTitle,
-        )
+        Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
+            CoverArt(
+                imageUrl = coverUrl,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(10.dp),
+                iconSize = 28,
+                seed = seed.ifBlank { title },
+                titleText = coverTitle,
+            )
+            if (badge != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp),
+                ) {
+                    Text(
+                        text = badge,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(KwhaleSpacing.xs))
         Text(
             text = title,
@@ -638,9 +729,20 @@ fun AlbumCard(
         Text(
             text = artist,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (onArtistClick != null) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = if (onArtistClick != null) {
+                Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = LocalIndication.current,
+                        onClickLabel = "Открыть исполнителя",
+                        onClick = onArtistClick,
+                    )
+            } else Modifier,
         )
     }
 }
