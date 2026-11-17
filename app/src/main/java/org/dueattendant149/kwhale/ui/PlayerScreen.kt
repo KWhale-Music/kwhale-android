@@ -91,6 +91,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -103,6 +104,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.sign
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.design.KwhaleCoverPalette
 import org.dueattendant149.kwhale.design.KwhaleSpacing
@@ -234,28 +237,57 @@ fun PlayerScreen(
         val shape = RoundedCornerShape(20.dp)
         val swipeThresholdPx = with(density) { 72.dp.toPx() }
         val maxSwipePx = with(density) { 140.dp.toPx() }
+        val flingVelocityPx = with(density) { 900.dp.toPx() } // fast flick skips even over a short drag
 
         Box(
             modifier = modifier.pointerInput(artwork.id) {
                 var totalDrag = 0f
+                val velocityTracker = VelocityTracker()
+                // Track phase: 1:1 with the finger; past the travel limit the
+                // cover resists (rubber-band) instead of hitting a hard wall.
+                fun rubberBand(drag: Float): Float {
+                    val excess = abs(drag) - maxSwipePx
+                    return if (excess <= 0f) drag
+                    else sign(drag) * (maxSwipePx + excess * 0.25f)
+                }
                 detectHorizontalDragGestures(
-                    onDragStart = { totalDrag = 0f },
+                    onDragStart = {
+                        totalDrag = 0f
+                        velocityTracker.resetTracking()
+                    },
                     onDragCancel = {
                         totalDrag = 0f
                         scope.launch { artworkSwipeOffset.animateTo(0f, spring()) }
                     },
                     onDragEnd = {
                         val delta = totalDrag
+                        val velocity = velocityTracker.calculateVelocity().x
                         totalDrag = 0f
+                        // Dismiss on distance OR velocity: a fast flick counts
+                        // even when the cover barely moved.
                         when {
-                            delta > swipeThresholdPx -> app.player.previous()
-                            delta < -swipeThresholdPx -> app.player.next()
+                            delta > swipeThresholdPx || velocity > flingVelocityPx ->
+                                app.player.previous()
+                            delta < -swipeThresholdPx || velocity < -flingVelocityPx ->
+                                app.player.next()
                         }
-                        scope.launch { artworkSwipeOffset.animateTo(0f, spring()) }
+                        // Release phase: a spring seeded with the finger's
+                        // velocity — the cover leaves the finger at its speed.
+                        scope.launch {
+                            artworkSwipeOffset.animateTo(
+                                0f,
+                                spring(
+                                    dampingRatio = 0.75f,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                                initialVelocity = velocity,
+                            )
+                        }
                     },
                 ) { change, dragAmount ->
                     change.consume()
-                    totalDrag = (totalDrag + dragAmount).coerceIn(-maxSwipePx, maxSwipePx)
+                    velocityTracker.addPosition(change.uptimeMillis, change.position)
+                    totalDrag = rubberBand(totalDrag + dragAmount)
                     if (!reducedMotion) {
                         scope.launch { artworkSwipeOffset.snapTo(totalDrag) }
                     }

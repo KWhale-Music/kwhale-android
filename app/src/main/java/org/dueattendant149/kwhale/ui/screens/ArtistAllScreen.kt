@@ -218,6 +218,7 @@ private fun ArtistTracks(
                         ?.takeIf { it != artistId }
                         ?.let { id -> onOpenCollection("artist", id) }
                 },
+                modifier = Modifier.animateItem(),
             )
         }
         if (next != null) {

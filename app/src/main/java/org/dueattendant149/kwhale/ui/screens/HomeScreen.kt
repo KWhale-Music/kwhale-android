@@ -615,6 +615,7 @@ private fun LazyListScope.TrackItems(
             onClick = { onPlay(tracks, index) },
             onToggleLike = { onToggleLike(track) },
             onOverflow = { onMenu(track) },
+            modifier = Modifier.animateItem(),
         )
     }
 }

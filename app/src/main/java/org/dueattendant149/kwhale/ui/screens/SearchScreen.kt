@@ -405,6 +405,7 @@ fun SearchScreen(
                                         onArtistClick = {
                                             track.primaryArtistId()?.let { onOpenCollection("artist", it) }
                                         },
+                                        modifier = Modifier.animateItem(),
                                     )
                                 }
                             }

@@ -1,5 +1,6 @@
 package org.dueattendant149.kwhale.ui.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -49,8 +50,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,6 +85,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import org.dueattendant149.kwhale.design.KwhaleCoverPalette
+import org.dueattendant149.kwhale.design.KwhaleMotion
 import org.dueattendant149.kwhale.design.KwhalePlural
 import org.dueattendant149.kwhale.design.KwhaleSpacing
 import org.dueattendant149.kwhale.design.rememberReducedMotionEnabled
@@ -562,13 +567,33 @@ fun LikeIconButton(
     modifier: Modifier = Modifier,
     size: Int = 22,
 ) {
+    val reducedMotion = rememberReducedMotionEnabled()
+    // Liking applies a force: the heart pops up and settles with the shared
+    // spring. Un-liking and re-rendering stay still; reduced motion disables
+    // the pop entirely (direct feedback, no bounce).
+    val pop = remember { Animatable(1f) }
+    var firstRun by remember { mutableStateOf(true) }
+    LaunchedEffect(liked) {
+        if (firstRun) {
+            firstRun = false
+            return@LaunchedEffect
+        }
+        if (reducedMotion || !liked) return@LaunchedEffect
+        pop.animateTo(1.28f, KwhaleMotion.springy())
+        pop.animateTo(1f, KwhaleMotion.springy())
+    }
     IconButton(onClick = onClick, modifier = modifier) {
         Icon(
             imageVector = if (liked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
             contentDescription = if (liked) "Убрать из любимых" else "В любимые",
             tint = if (liked) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(size.dp),
+            modifier = Modifier
+                .size(size.dp)
+                .graphicsLayer {
+                    scaleX = pop.value
+                    scaleY = pop.value
+                },
         )
     }
 }

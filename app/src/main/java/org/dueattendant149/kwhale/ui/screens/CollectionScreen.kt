@@ -795,6 +795,7 @@ fun CollectionScreen(
                             },
                             onOverflow = { onTrackMenu(track) },
                             number = index + 1,
+                            modifier = Modifier.animateItem(),
                             onArtistClick = {
                                 track.primaryArtistId()
                                     ?.takeIf { kind != "artist" || it != collectionId }
