@@ -60,7 +60,8 @@ class KwhaleApp : Application() {
 
     val updater: AppUpdater by lazy {
         AppUpdater(
-            apiProvider = { api },
+            fetchLatest = { api.appReleaseLatest() },
+            downloadApk = { target, onProgress -> api.downloadAppRelease(target, onProgress) },
             scope = appScope,
             currentVersionCode = { BuildConfig.VERSION_CODE },
         )

@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.dueattendant149.kwhale.network.KwhaleApi
 import org.dueattendant149.kwhale.network.model.AppRelease
 import java.io.File
 
@@ -22,10 +21,12 @@ import java.io.File
  * Check runs in the background at startup and on demand from the profile
  * screen. Download streams to cacheDir/updates (FileProvider-visible) and the
  * install intent goes through the platform package installer — the only way a
- * sideloaded app can update itself.
+ * sideloaded app can update itself. Network access is injected via two
+ * lambdas, so the state machine is unit-testable without a server.
  */
 class AppUpdater(
-    private val apiProvider: () -> KwhaleApi,
+    private val fetchLatest: suspend () -> AppRelease?,
+    private val downloadApk: suspend (target: File, onProgress: (Long, Long) -> Unit) -> File,
     private val scope: CoroutineScope,
     private val currentVersionCode: () -> Int,
 ) {
@@ -52,7 +53,7 @@ class AppUpdater(
         lastCheckAt = now
         scope.launch {
             if (_state.value is State.Available || _state.value is State.Downloading) return@launch
-            val release = runCatching { apiProvider().appReleaseLatest() }.getOrNull() ?: return@launch
+            val release = runCatching { fetchLatest() }.getOrNull() ?: return@launch
             if (release.versionCode > currentVersionCode()) {
                 _state.value = State.Available(release)
             }
@@ -63,7 +64,7 @@ class AppUpdater(
     fun checkManual() {
         scope.launch {
             _state.value = State.Checking
-            val release = runCatching { apiProvider().appReleaseLatest() }.getOrElse {
+            val release = runCatching { fetchLatest() }.getOrElse {
                 _state.value = State.Failed(it.message ?: "Не удалось проверить обновления")
                 return@launch
             }
@@ -82,7 +83,7 @@ class AppUpdater(
                 val dir = File(context.cacheDir, "updates").apply { mkdirs() }
                 val target = File(dir, "kwhale-${release.versionName}.apk")
                 withContext(Dispatchers.IO) {
-                    apiProvider().downloadAppRelease(target) { read, total ->
+                    downloadApk(target) { read, total ->
                         _state.value = State.Downloading(read, total)
                     }
                 }
