@@ -431,7 +431,11 @@ class Media3Player(
             .setMediaId(track.id.toString())
             // Key by the stable remote id, so the playback cache survives a
             // base-URL change and prefetch/playback share the same entry.
-            .setCustomCacheKey("track:${track.remoteId ?: track.id}")
+            // The v2 prefix is a one-time cache generation bump: v1 entries
+            // were written before the server verified downloaded content and
+            // can hold another recording's audio under a correct title (the
+            // «body double»/«amy» mixup, 2026-11-18) — they must never play.
+            .setCustomCacheKey("v2:track:${track.remoteId ?: track.id}")
             .setUri(uriFor(track))
             .setMediaMetadata(metadata)
             .build()
@@ -442,7 +446,16 @@ class Media3Player(
         // survives base-URL changes and works in airplane mode. streamUrl matching is
         // a legacy fallback (O(N)); remoteId lookup is O(1).
         track.remoteId?.let { rid ->
-            downloads.get(rid)?.let { d -> if (d.file().exists()) return d.uri() }
+            downloads.get(rid)?.let { d ->
+                // A downloaded file whose recorded duration contradicts the track
+                // is a different recording (mislabeled source, 2026-11-18) — never
+                // play it; stream the verified server copy instead. durationSec is
+                // measured at download time (new records), so old records with the
+                // copied metadata duration simply pass through.
+                val mismatch = d.durationSec > 40 && track.durationSec > 40 &&
+                    kotlin.math.abs(d.durationSec - track.durationSec) > 30
+                if (!mismatch && d.file().exists()) return d.uri()
+            }
         }
         downloads.localUriFor(track.streamUrl)?.let { return it }
         return Uri.parse(track.streamUrl.orEmpty())

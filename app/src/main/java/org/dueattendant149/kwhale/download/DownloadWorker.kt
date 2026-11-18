@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.media.MediaMetadataRetriever
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
@@ -50,6 +51,17 @@ class DownloadWorker(
                 val renamed = File(dir, "$safeId.$ext")
                 if (destination.renameTo(renamed)) finalDest = renamed
             }
+            // Content identity check: a mislabeled server source can deliver a
+            // different recording under the right name (the
+            // «body double»/«amy» mixup, 2026-11-18) — measure the file and
+            // refuse to keep it when it contradicts the requested duration.
+            val measuredSec = measuredDurationSec(finalDest)
+            if (measuredSec > 0 && durationSec > MIN_RELIABLE_DURATION_SEC &&
+                kotlin.math.abs(measuredSec - durationSec) > DURATION_TOLERANCE_SEC
+            ) {
+                finalDest.delete()
+                return Result.failure()
+            }
             store.save(
                 DownloadedTrack(
                     remoteId = remoteId,
@@ -58,7 +70,9 @@ class DownloadWorker(
                     artist = artist,
                     filePath = finalDest.absolutePath,
                     coverUrl = coverUrl,
-                    durationSec = durationSec,
+                    // measured beats metadata: playback uses it to spot files
+                    // that drifted away from the track they belong to
+                    durationSec = if (measuredSec > 0) measuredSec else durationSec,
                     bytes = finalDest.length(),
                 ),
             )
@@ -66,6 +80,20 @@ class DownloadWorker(
         } catch (error: Exception) {
             destination.delete()
             if (runAttemptCount < 3) Result.retry() else Result.failure()
+        }
+    }
+
+    private fun measuredDurationSec(file: File): Int {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(file.absolutePath)
+            val ms = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull() ?: 0L
+            (ms / 1000L).toInt()
+        } catch (_: Exception) {
+            0
+        } finally {
+            runCatching { retriever.release() }
         }
     }
 
@@ -116,5 +144,10 @@ class DownloadWorker(
         const val KEY_PROGRESS = "progress"
         const val KEY_PATH = "path"
         private const val NOTIFICATION_ID = 4101
+
+        // Mirror of server services/downloader.py: rows with junk preview
+        // durations (<= 40 s canonical) cannot judge content identity.
+        private const val MIN_RELIABLE_DURATION_SEC = 40
+        private const val DURATION_TOLERANCE_SEC = 30
     }
 }
