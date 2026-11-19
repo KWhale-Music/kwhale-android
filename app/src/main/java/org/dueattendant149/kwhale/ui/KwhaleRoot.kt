@@ -12,6 +12,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -306,6 +307,24 @@ fun KwhaleRoot(
                     val quickExit = fadeOut(
                         tween(KwhaleMotion.durationFast, easing = KwhaleMotion.emphasizedAccelerate),
                     )
+                    // Tab → tab is a true fade-through: the outgoing screen fades
+                    // out completely (180 ms) BEFORE the incoming one starts
+                    // (delayed 180 ms), so the two are never semi-visible at the
+                    // same time — the old parallel fades were the «растворение».
+                    val fadeThroughEnter = fadeIn(
+                        tween(
+                            KwhaleMotion.durationStd,
+                            delayMillis = KwhaleMotion.durationFast,
+                            easing = KwhaleMotion.emphasizedDecelerate,
+                        ),
+                    ) + scaleIn(
+                        initialScale = 1.02f,
+                        animationSpec = tween(
+                            KwhaleMotion.durationStd,
+                            delayMillis = KwhaleMotion.durationFast,
+                            easing = KwhaleMotion.emphasizedDecelerate,
+                        ),
+                    )
                     val pushEnter = if (reducedMotion) {
                         calmEnter
                     } else {
@@ -357,7 +376,7 @@ fun KwhaleRoot(
                         modifier = Modifier.padding(innerPadding),
                         enterTransition = {
                             if (reducedMotion) EnterTransition.None
-                            else if (isTab(initialState) && isTab(targetState)) calmEnter else pushEnter
+                            else if (isTab(initialState) && isTab(targetState)) fadeThroughEnter else pushEnter
                         },
                         exitTransition = {
                             if (reducedMotion) ExitTransition.None
@@ -521,7 +540,10 @@ fun KwhaleRoot(
             onDismissRequest = { showPlayer = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             sheetMaxWidth = Dp.Unspecified,
-            containerColor = Color.Transparent,
+            // Opaque container: with Color.Transparent the artwork cross-fade
+            // composited at ~75% alpha and the screen underneath showed through
+            // («растворение», 2026-11-19 video).
+            containerColor = MaterialTheme.colorScheme.surface,
             dragHandle = null,
             contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
         ) {
