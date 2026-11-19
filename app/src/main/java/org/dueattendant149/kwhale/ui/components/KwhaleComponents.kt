@@ -614,7 +614,6 @@ fun TrackTile(
         modifier = modifier
             .pressScale(interaction)
             .width(132.dp)
-            .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
                 interactionSource = interaction,
                 indication = LocalIndication.current,
@@ -710,7 +709,6 @@ fun AlbumCard(
         modifier = modifier
             .pressScale(interaction)
             .width(width.dp)
-            .clip(RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = interaction,
                 indication = LocalIndication.current,
@@ -785,7 +783,6 @@ fun PlaylistCard(
         modifier = modifier
             .pressScale(interaction)
             .width(width.dp)
-            .clip(RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = interaction,
                 indication = LocalIndication.current,
@@ -832,7 +829,6 @@ fun ArtistCard(
         modifier = modifier
             .pressScale(interaction)
             .width(size.dp)
-            .clip(RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = interaction,
                 indication = LocalIndication.current,

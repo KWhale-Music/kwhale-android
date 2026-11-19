@@ -6,6 +6,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -86,6 +88,7 @@ private val searchTypes = listOf(
     "playlists" to "Плейлисты",
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(
     app: KwhaleApp,
@@ -214,12 +217,16 @@ fun SearchScreen(
         )
 
         if (query.isNotBlank()) {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
+            // Wrap instead of horizontal scroll: five fixed category chips used
+            // to hang half-cut off the right screen edge («обрывки кнопок»).
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
             ) {
-                items(searchTypes, key = { it.first }) { (typeKey, label) ->
+                searchTypes.forEach { (typeKey, label) ->
                     FilterChip(
                         selected = selectedType == typeKey,
                         onClick = { selectedType = typeKey },
@@ -258,12 +265,13 @@ fun SearchScreen(
         if (query.isBlank()) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp + miniPlayerBottom),
+                contentPadding = PaddingValues(bottom = 28.dp + miniPlayerBottom),
             ) {
                 if (history.isNotEmpty()) {
                     item {
                         SectionHeader(
                             title = "Недавние запросы",
+                            modifier = Modifier.padding(horizontal = 20.dp),
                             action = "Очистить",
                             onAction = {
                                 scope.launch {
@@ -287,7 +295,7 @@ fun SearchScreen(
                                     query = q
                                     focusManager.clearFocus()
                                 }
-                                .padding(vertical = 10.dp),
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
@@ -302,9 +310,12 @@ fun SearchScreen(
                     }
                 }
                 if (genres.isNotEmpty()) {
-                    item { SectionHeader("Жанры") }
+                    item { SectionHeader("Жанры", modifier = Modifier.padding(horizontal = 20.dp)) }
                     item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                        ) {
                             items(genres.take(12)) { genre ->
                                 FilterChip(
                                     selected = false,
@@ -319,9 +330,12 @@ fun SearchScreen(
                     }
                 }
                 if (topArtists.isNotEmpty()) {
-                    item { SectionHeader("Популярные артисты") }
+                    item { SectionHeader("Популярные артисты", modifier = Modifier.padding(horizontal = 20.dp)) }
                     item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                        ) {
                             items(topArtists) { artist ->
                                 ArtistCard(
                                     artist = artist,
@@ -368,9 +382,13 @@ fun SearchScreen(
                     else -> {
                         LazyColumn(
                             modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp + miniPlayerBottom),
+                            contentPadding = PaddingValues(bottom = 28.dp + miniPlayerBottom),
                         ) {
-                            item { TopResult(data!!.top, app, onOpenCollection) }
+                            item {
+                                Box(Modifier.padding(horizontal = 20.dp)) {
+                                    TopResult(data!!.top, app, onOpenCollection)
+                                }
+                            }
                             val top = data!!.top
                             val tracks = data.tracks.filterNot {
                                 top?.type == "track" && it.id == top.track?.id
@@ -385,7 +403,7 @@ fun SearchScreen(
                                 top?.type == "playlist" && it.id == top.playlist?.id
                             }
                             if (tracks.isNotEmpty()) {
-                                item { SectionHeader("Треки") }
+                                item { SectionHeader("Треки", modifier = Modifier.padding(horizontal = 20.dp)) }
                                 itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                                     TrackRow(
                                         track = track,
@@ -405,16 +423,19 @@ fun SearchScreen(
                                         onArtistClick = {
                                             track.primaryArtistId()?.let { onOpenCollection("artist", it) }
                                         },
-                                        modifier = Modifier.animateItem(),
+                                        modifier = Modifier.animateItem().padding(horizontal = 20.dp),
                                     )
                                 }
                             }
                             if (albums.isNotEmpty()) {
                                 item {
-                                    SectionHeader("Альбомы")
+                                    SectionHeader("Альбомы", modifier = Modifier.padding(horizontal = 20.dp))
                                 }
                                 item {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 20.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
                                         listOf("all" to "Все", "album" to "Альбомы", "single" to "Синглы и EP").forEach { (key, label) ->
                                             FilterChip(
                                                 selected = albumFilter == key,
@@ -435,12 +456,15 @@ fun SearchScreen(
                                             text = "В этой категории ничего нет",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                                         )
                                     }
                                 } else {
                                     item {
-                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            contentPadding = PaddingValues(horizontal = 20.dp),
+                                        ) {
                                             items(filteredAlbums) { album ->
                                                 AlbumCard(
                                                     album = album,
@@ -456,9 +480,12 @@ fun SearchScreen(
                                 }
                             }
                             if (playlists.isNotEmpty()) {
-                                item { SectionHeader("Плейлисты") }
+                                item { SectionHeader("Плейлисты", modifier = Modifier.padding(horizontal = 20.dp)) }
                                 item {
-                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(horizontal = 20.dp),
+                                    ) {
                                         items(playlists) { playlist ->
                                             PlaylistCard(
                                                 playlist = playlist,
@@ -470,9 +497,12 @@ fun SearchScreen(
                                 }
                             }
                             if (artists.isNotEmpty()) {
-                                item { SectionHeader("Артисты") }
+                                item { SectionHeader("Артисты", modifier = Modifier.padding(horizontal = 20.dp)) }
                                 item {
-                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(horizontal = 20.dp),
+                                    ) {
                                         items(artists) { artist ->
                                             ArtistCard(
                                                 artist = artist,
