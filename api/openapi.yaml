@@ -307,6 +307,20 @@ paths:
               schema: { type: string, format: binary }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /tracks/{trackId}/info:
+    get:
+      tags: [Tracks]
+      operationId: getTrackInfo
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      responses:
+        '200':
+          description: Метаданные трека, качество аудио и источники
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackInfo' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /tracks/{trackId}/lyrics:
     get:
       tags: [Tracks]
@@ -1315,6 +1329,39 @@ components:
         previewAvailable: { type: boolean }
         playCount: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
+
+    TrackQualityInfo:
+      type: object
+      properties:
+        codec: { type: string, nullable: true }
+        bitrateKbps: { type: integer, nullable: true }
+        sampleRate: { type: integer, nullable: true }
+        bitDepth: { type: integer, nullable: true }
+        channels: { type: integer, nullable: true }
+        lossless: { type: boolean }
+        tier: { type: integer }
+        bytes: { type: integer, format: int64, nullable: true }
+        measuredDurationMs: { type: integer, format: int64, nullable: true }
+        error: { type: string, nullable: true }
+
+    TrackSourceInfo:
+      type: object
+      required: [connector, available]
+      properties:
+        connector: { type: string, description: local | icm | yandex | soundcloud | ytmusic | … }
+        available: { type: boolean }
+        qualityTier: { type: integer, nullable: true }
+
+    TrackInfo:
+      type: object
+      required: [track, sources]
+      properties:
+        track: { $ref: '#/components/schemas/Track' }
+        isrc: { type: string, nullable: true }
+        quality: { $ref: '#/components/schemas/TrackQualityInfo' }
+        sources:
+          type: array
+          items: { $ref: '#/components/schemas/TrackSourceInfo' }
 
     CensorshipReportRequest:
       type: object

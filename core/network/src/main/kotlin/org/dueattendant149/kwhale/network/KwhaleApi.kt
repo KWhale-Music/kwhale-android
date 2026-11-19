@@ -38,6 +38,7 @@ import org.dueattendant149.kwhale.network.model.SearchResponse
 import org.dueattendant149.kwhale.network.model.Session
 import org.dueattendant149.kwhale.network.model.Suggestions
 import org.dueattendant149.kwhale.network.model.Track
+import org.dueattendant149.kwhale.network.model.TrackInfo
 import org.dueattendant149.kwhale.network.model.TrackRecommendationsPage
 import org.dueattendant149.kwhale.network.model.TracksPage
 import org.dueattendant149.kwhale.network.model.User
@@ -146,6 +147,7 @@ class KwhaleApi(
     // ---- catalog ----------------------------------------------------------
 
     suspend fun track(id: String): Track = client.get("/tracks/$id", Track.serializer())
+    suspend fun trackInfo(id: String): TrackInfo = client.get("/tracks/$id/info", TrackInfo.serializer())
     suspend fun album(id: String): Album = client.get("/albums/$id", Album.serializer())
     suspend fun albumTracks(
         id: String,

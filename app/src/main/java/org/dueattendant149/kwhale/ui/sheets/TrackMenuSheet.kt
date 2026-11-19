@@ -28,13 +28,17 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,6 +60,7 @@ import org.dueattendant149.kwhale.ui.components.CoverArt
 import org.dueattendant149.kwhale.ui.components.artistLine
 import org.dueattendant149.kwhale.ui.components.imageUrl
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackMenuSheet(
     app: KwhaleApp,
@@ -88,6 +93,7 @@ fun TrackMenuSheet(
         track.artists.filter { !it.id.startsWith("unknown-") && it.name.isNotBlank() }
     }
     var showArtistPicker by remember { mutableStateOf(false) }
+    var showInfo by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -288,6 +294,11 @@ fun TrackMenuSheet(
                 onDismiss()
             },
         )
+        MenuAction(
+            icon = Icons.Outlined.Info,
+            title = "О треке",
+            onClick = { showInfo = true },
+        )
     }
 
     if (showArtistPicker) {
@@ -315,6 +326,15 @@ fun TrackMenuSheet(
                 }
             },
         )
+    }
+
+    if (showInfo) {
+        ModalBottomSheet(
+            onDismissRequest = { showInfo = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            TrackInfoSheet(app = app, track = track, onDismiss = { showInfo = false })
+        }
     }
 }
 

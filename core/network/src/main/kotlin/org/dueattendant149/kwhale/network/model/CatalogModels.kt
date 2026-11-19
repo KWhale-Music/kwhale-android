@@ -27,6 +27,35 @@ data class Track(
 )
 
 @Serializable
+data class TrackQualityInfo(
+    val codec: String? = null,
+    val bitrateKbps: Int? = null,
+    val sampleRate: Int? = null,
+    val bitDepth: Int? = null,
+    val channels: Int? = null,
+    val lossless: Boolean = false,
+    val tier: Int = 0,
+    val bytes: Long? = null,
+    val measuredDurationMs: Long? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class TrackSourceInfo(
+    val connector: String,
+    val available: Boolean = true,
+    val qualityTier: Int? = null,
+)
+
+@Serializable
+data class TrackInfo(
+    val track: Track,
+    val isrc: String? = null,
+    val quality: TrackQualityInfo? = null,
+    val sources: List<TrackSourceInfo> = emptyList(),
+)
+
+@Serializable
 data class Album(
     val id: String,
     val title: String,
