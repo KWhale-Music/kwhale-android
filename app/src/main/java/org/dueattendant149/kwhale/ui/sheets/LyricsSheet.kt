@@ -1,6 +1,11 @@
 package org.dueattendant149.kwhale.ui.sheets
 
 import android.content.Intent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -40,6 +46,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -113,9 +120,20 @@ fun LyricsSheet(
 
     LaunchedEffect(activeIndex, followPlayback) {
         if (followPlayback && activeIndex in lines.indices) {
+            // Karaoke comfort band: only re-centre when the active line drifts
+            // out of the middle half of the viewport. Re-centring on every line
+            // change was the «дёргаются» bug.
             val viewport = listState.layoutInfo.viewportSize.height
-            val centerOffset = if (viewport > 0) -(viewport / 3) else 0
-            runCatching { listState.animateScrollToItem(activeIndex, scrollOffset = centerOffset) }
+            val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == activeIndex }
+            val topBand = viewport / 4
+            val bottomBand = viewport * 3 / 4
+            val outOfBand = item == null ||
+                item.offset < topBand || item.offset + item.size > bottomBand
+            if (outOfBand && viewport > 0) {
+                runCatching {
+                    listState.animateScrollToItem(activeIndex, scrollOffset = -(viewport / 3))
+                }
+            }
         }
     }
 
@@ -131,6 +149,9 @@ fun LyricsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Nearly full-screen panel: the old 560dp cap made the sheet look
+                // half-open and cut the last lines at the rounded corners.
+                .fillMaxHeight(0.86f)
                 .padding(bottom = 24.dp),
         ) {
             Row(
@@ -191,7 +212,7 @@ fun LyricsSheet(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 560.dp),
+                            .weight(1f),
                     ) {
                         LazyColumn(
                             state = listState,
@@ -202,16 +223,35 @@ fun LyricsSheet(
                         ) {
                             itemsIndexed(lines) { index, line ->
                                 val active = index == activeIndex
+                                // Same type style for every line — changing the font
+                                // size on activation re-laid out the whole list and
+                                // made the text jump («дёргаются»). Colour + a small
+                                // spring scale carry the highlight instead.
+                                val lineColor by animateColorAsState(
+                                    targetValue = if (active) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    animationSpec = tween(220),
+                                    label = "lyricColor",
+                                )
+                                val lineScale by animateFloatAsState(
+                                    targetValue = if (active) 1.06f else 1f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessLow,
+                                    ),
+                                    label = "lyricScale",
+                                )
                                 Text(
                                     text = line.text,
-                                    style = if (active) MaterialTheme.typography.headlineSmall
-                                    else MaterialTheme.typography.titleLarge,
-                                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (active) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = lineColor,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .graphicsLayer {
+                                            scaleX = lineScale
+                                            scaleY = lineScale
+                                        }
                                         .clickable {
                                             followPlayback = true
                                             app.player.seekTo(line.startMs)
@@ -251,8 +291,8 @@ fun LyricsSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .weight(1f)
                             .padding(20.dp)
-                            .heightIn(max = 560.dp)
                             .verticalScroll(rememberScrollState()),
                     )
                 }
