@@ -306,7 +306,13 @@ fun LibraryScreen(
                 item {
                     Spacer(Modifier.size(16.dp))
                     Button(
-                        onClick = { app.player.playQueue(tracks.shuffled().map { it.toUi(app.api) }, 0) },
+                        onClick = {
+                            app.player.playQueue(
+                                tracks.shuffled().map { it.toUi(app.api) },
+                                0,
+                                surface = "library",
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
@@ -355,7 +361,9 @@ fun LibraryScreen(
                         api = app.api,
                         liked = app.reactions.isLiked(track.id, track.isLiked, likedOverrides),
                         isCurrent = track.id == currentRemoteId,
-                        onClick = { app.player.playQueue(tracks.map { it.toUi(app.api) }, index) },
+                        onClick = {
+                            app.player.playQueue(tracks.map { it.toUi(app.api) }, index, surface = "library")
+                        },
                         onToggleLike = {
                             app.cache.invalidateLibrary()
                             app.reactions.toggleLike(track, app.api, "library") { msg ->

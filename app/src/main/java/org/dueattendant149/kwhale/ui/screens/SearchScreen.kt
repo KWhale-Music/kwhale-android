@@ -412,7 +412,7 @@ fun SearchScreen(
                                         isCurrent = track.id == currentRemoteId,
                                         onClick = {
                                             focusManager.clearFocus()
-                                            app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
+                                            app.player.playQueue(tracks.map { it.toUi(app.api) }, index, surface = "search")
                                         },
                                         onToggleLike = {
                                             app.reactions.toggleLike(track, app.api, "search") { msg ->
@@ -551,7 +551,7 @@ private fun TopResult(
                 track.title,
                 track.artistLine(),
                 track.imageUrl(app.api),
-                { app.player.playQueue(listOf(track.toUi(app.api)), 0) },
+                { app.player.playQueue(listOf(track.toUi(app.api)), 0, surface = "search") },
                 { track.primaryArtistId()?.let { id -> onOpenCollection("artist", id) } },
             )
         }

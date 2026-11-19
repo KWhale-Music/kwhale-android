@@ -166,6 +166,20 @@ fun HomeScreen(
     val moodMixes = mixes.filter { it.kind == "mood" }
     val moreMixes = mixes.filter { it.kind == "genre" || it.kind == "artist" }
 
+    val seenMixImpressions = remember { mutableSetOf<String>() }
+    LaunchedEffect(mixes) {
+        mixes.forEachIndexed { idx, mix ->
+            if (seenMixImpressions.add(mix.id)) {
+                app.events.impression(
+                    track = null,
+                    surface = "home",
+                    mixId = mix.id,
+                    position = idx,
+                )
+            }
+        }
+    }
+
     fun playMix(mix: Mix) {
         if (loadingMixId != null) return
         loadingMixId = mix.id
@@ -175,7 +189,7 @@ fun HomeScreen(
                 .onSuccess { page ->
                     val tracks = page.items.map { it.track.toUi(app.api) }
                     if (tracks.isNotEmpty()) {
-                        app.player.playQueue(tracks, 0)
+                        app.player.playQueue(tracks, 0, surface = "mix", mixId = mix.id)
                     } else {
                         snackbar?.showSnackbar("В миксе пока нет доступных треков")
                     }
@@ -197,11 +211,14 @@ fun HomeScreen(
                 val mixId = action.removePrefix("mix:")
                 mixes.firstOrNull { it.id == mixId }?.let(::playMix)
                     ?: run {
+                        app.events.mixClick(mixId)
                         scope.launch {
                             runCatching { app.api.mixTracks(mixId, limit = 50) }
                                 .onSuccess { page ->
                                     val tracks = page.items.map { it.track.toUi(app.api) }
-                                    if (tracks.isNotEmpty()) app.player.playQueue(tracks, 0)
+                                    if (tracks.isNotEmpty()) {
+                                        app.player.playQueue(tracks, 0, surface = "mix", mixId = mixId)
+                                    }
                                 }
                         }
                     }
@@ -232,7 +249,12 @@ fun HomeScreen(
                     if (tracks.isEmpty()) {
                         promptError = "Ничего не нашлось — попробуйте другой запрос"
                     } else {
-                        app.player.playQueue(tracks, 0)
+                        app.player.playQueue(
+                            tracks,
+                            0,
+                            surface = "mix",
+                            mixId = "prompt:" + text.trim().take(64),
+                        )
                     }
                 }
                 .onFailure { promptError = it.message ?: "Ошибка сети" }
@@ -512,7 +534,7 @@ fun HomeScreen(
                                 app = app,
                                 currentRemoteId = currentRemoteId,
                                 onPlay = { tracks, index ->
-                                    app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
+                                    app.player.playQueue(tracks.map { it.toUi(app.api) }, index, surface = "home")
                                 },
                                 onMenu = onTrackMenu,
                             )
@@ -540,7 +562,7 @@ fun HomeScreen(
                                         app = app,
                                         currentRemoteId = currentRemoteId,
                                         onPlay = { tracks, index ->
-                                            app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
+                                            app.player.playQueue(tracks.map { it.toUi(app.api) }, index, surface = "home")
                                         },
                                         onMenu = onTrackMenu,
                                     )
@@ -554,7 +576,7 @@ fun HomeScreen(
                                     likedOverrides = likedOverrides,
                                     currentRemoteId = currentRemoteId,
                                     onPlay = { tracks, index ->
-                                        app.player.playQueue(tracks.map { it.toUi(app.api) }, index)
+                                        app.player.playQueue(tracks.map { it.toUi(app.api) }, index, surface = "home")
                                     },
                                     onToggleLike = { track ->
                                         app.reactions.toggleLike(track, app.api, "home") { msg ->

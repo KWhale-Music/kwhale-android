@@ -50,10 +50,18 @@ class Media3Player(
     private var pendingQueue: List<Track>? = null
     private var pendingIndex: Int = 0
     private var currentSurface: String = "player"
+    private var currentMixId: String? = null
     private var lastIndex: Int = 0
     private var playRequestedAt: Long = 0L
     private var loggedReadyKey: String? = null
     private var retriedErrorKey: String? = null
+    private var accumulatedListenedMs: Long = 0L
+    private var activePlayStartedElapsedMs: Long? = null
+    private var completedForIdx: Int = -1
+    private var finalizedForIdx: Int = -1
+
+    val activeSurface: String get() = currentSurface
+    val activeMixId: String? get() = currentMixId
 
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -61,18 +69,80 @@ class Media3Player(
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
+    private fun syncListenedClock(isPlayingNow: Boolean) {
+        val started = activePlayStartedElapsedMs
+        if (started != null) {
+            accumulatedListenedMs += (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L)
+            activePlayStartedElapsedMs = null
+        }
+        if (isPlayingNow) {
+            activePlayStartedElapsedMs = SystemClock.elapsedRealtime()
+        }
+    }
+
+    private fun currentListenedMs(): Long {
+        val active = activePlayStartedElapsedMs?.let { (SystemClock.elapsedRealtime() - it).coerceAtLeast(0L) } ?: 0L
+        return accumulatedListenedMs + active
+    }
+
+    private fun resetTrackTelemetry(index: Int, playing: Boolean = controller?.isPlaying == true) {
+        accumulatedListenedMs = 0L
+        activePlayStartedElapsedMs = if (playing) SystemClock.elapsedRealtime() else null
+        completedForIdx = -1
+        finalizedForIdx = -1
+        lastIndex = index
+    }
+
+    private fun finalizeTrack(index: Int, endedNaturally: Boolean, durationHintMs: Long? = null) {
+        if (index == finalizedForIdx || index !in queue.indices) return
+        finalizedForIdx = index
+        syncListenedClock(false)
+        val track = queue[index]
+        val listened = currentListenedMs().coerceAtLeast(0L)
+        val durMs = durationHintMs?.takeIf { it > 0L }
+            ?: controller?.duration?.takeIf { it > 0L }
+            ?: (track.durationSec.toLong() * 1000L)
+        val thresholdMs = if (durMs > 0L) {
+            minOf(180_000L, (durMs * 0.80).toLong()).coerceAtLeast(15_000L)
+        } else {
+            30_000L
+        }
+        if (endedNaturally || listened >= thresholdMs) {
+            if (index != completedForIdx) {
+                completedForIdx = index
+                events.complete(
+                    track = track,
+                    surface = currentSurface,
+                    durationMs = durMs.takeIf { it > 0L },
+                    listenedMs = if (endedNaturally && listened == 0L) durMs else listened,
+                    mixId = currentMixId,
+                )
+            }
+        } else {
+            val pos = controller?.currentPosition?.coerceAtLeast(0L) ?: listened
+            events.skip(
+                track = track,
+                surface = currentSurface,
+                positionMs = pos,
+                listenedMs = listened,
+                mixId = currentMixId,
+            )
+        }
+    }
+
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = publish()
 
-        override fun onIsPlayingChanged(isPlaying: Boolean) = publish()
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            syncListenedClock(isPlaying)
+            publish()
+        }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) {
                 val ctrl = controller
                 val idx = ctrl?.currentMediaItemIndex ?: lastIndex
-                queue.getOrNull(idx)?.let { track ->
-                    events.complete(track, currentSurface, ctrl?.duration)
-                }
+                finalizeTrack(idx, endedNaturally = true, durationHintMs = ctrl?.duration)
             }
             if (playbackState == Player.STATE_READY && playRequestedAt > 0L) {
                 val idx = controller?.currentMediaItemIndex ?: -1
@@ -92,20 +162,30 @@ class Media3Player(
             loggedReadyKey = null
             retriedErrorKey = null
             val ctrl = controller
+            val prevIdx = lastIndex
             val newIdx = ctrl?.currentMediaItemIndex ?: 0
-            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
-                queue.getOrNull(lastIndex)?.let { prev ->
-                    events.complete(prev, currentSurface)
+            when (reason) {
+                Player.MEDIA_ITEM_TRANSITION_REASON_AUTO -> {
+                    finalizeTrack(prevIdx, endedNaturally = true)
+                    resetTrackTelemetry(newIdx)
+                    queue.getOrNull(newIdx)?.let { events.play(it, currentSurface, currentMixId) }
                 }
-                queue.getOrNull(newIdx)?.let { next ->
-                    events.play(next, currentSurface)
+                Player.MEDIA_ITEM_TRANSITION_REASON_SEEK -> {
+                    if (prevIdx != newIdx) {
+                        finalizeTrack(prevIdx, endedNaturally = false)
+                        resetTrackTelemetry(newIdx)
+                        queue.getOrNull(newIdx)?.let { events.play(it, currentSurface, currentMixId) }
+                    }
                 }
-            } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
-                queue.getOrNull(newIdx)?.let { track ->
-                    events.repeat(track, currentSurface, 0L)
+                Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT -> {
+                    finalizeTrack(prevIdx, endedNaturally = true)
+                    resetTrackTelemetry(newIdx)
+                    queue.getOrNull(newIdx)?.let { events.repeat(it, currentSurface, 0L, currentMixId) }
+                }
+                else -> {
+                    lastIndex = newIdx
                 }
             }
-            lastIndex = newIdx
             publish()
         }
 
@@ -152,7 +232,7 @@ class Media3Player(
             {
                 controller = runCatching { controllerFuture.get() }.getOrNull()
                 controller?.addListener(listener)
-                pendingQueue?.let { playQueue(it, pendingIndex, currentSurface) }
+                pendingQueue?.let { playQueue(it, pendingIndex, currentSurface, currentMixId) }
                 publish()
             },
             ContextCompat.getMainExecutor(context),
@@ -166,9 +246,20 @@ class Media3Player(
         }
     }
 
-    fun playQueue(tracks: List<Track>, startIndex: Int = 0, surface: String = "player") {
+    fun playQueue(
+        tracks: List<Track>,
+        startIndex: Int = 0,
+        surface: String = "player",
+        mixId: String? = null,
+    ) {
         if (tracks.isEmpty()) return
+        val previous = controller
+        if (queue.isNotEmpty() && previous != null) {
+            finalizeTrack(previous.currentMediaItemIndex, endedNaturally = false)
+        }
         currentSurface = surface
+        currentMixId = mixId?.takeIf { it.isNotBlank() }
+        events.setPlaybackContext(currentSurface, currentMixId)
         _playbackError.value = null
         val current = controller
         if (current == null) {
@@ -181,20 +272,20 @@ class Media3Player(
         playRequestedAt = SystemClock.elapsedRealtime()
         loggedReadyKey = null
         val safeIndex = startIndex.coerceIn(0, tracks.lastIndex)
-        lastIndex = safeIndex
+        resetTrackTelemetry(safeIndex, playing = true)
         val items = tracks.map(::mediaItemFor)
         current.setMediaItems(items, safeIndex, 0L)
         current.prepare()
         current.play()
-        queue.getOrNull(safeIndex)?.let { events.play(it, currentSurface) }
+        queue.getOrNull(safeIndex)?.let { events.play(it, currentSurface, currentMixId) }
         publish()
     }
 
     /** Insert [track] right after the currently playing item (or start playback if idle). */
-    fun playNext(track: Track, surface: String = "player") {
+    fun playNext(track: Track, surface: String = "player", mixId: String? = null) {
         val current = controller
         if (queue.isEmpty() || current == null) {
-            playQueue(listOf(track), 0, surface)
+            playQueue(listOf(track), 0, surface, mixId)
             return
         }
         val insertIndex = (current.currentMediaItemIndex + 1).coerceIn(0, queue.size)
@@ -221,9 +312,13 @@ class Media3Player(
     }
 
     /** Append [tracks] to the end of the queue without interrupting playback. */
-    fun addQueue(tracks: List<Track>, surface: String = "player") {
+    fun addQueue(tracks: List<Track>, surface: String = "player", mixId: String? = null) {
         if (tracks.isEmpty()) return
-        currentSurface = surface
+        if (queue.isEmpty()) {
+            currentSurface = surface
+            currentMixId = mixId?.takeIf { it.isNotBlank() }
+            events.setPlaybackContext(currentSurface, currentMixId)
+        }
         val current = controller
         if (current == null) {
             pendingQueue = (pendingQueue ?: emptyList()) + tracks
@@ -235,9 +330,10 @@ class Media3Player(
         if (wasEmpty) {
             playRequestedAt = SystemClock.elapsedRealtime()
             loggedReadyKey = null
+            resetTrackTelemetry(0, playing = true)
             current.prepare()
             current.play()
-            queue.getOrNull(0)?.let { events.play(it, currentSurface) }
+            queue.getOrNull(0)?.let { events.play(it, currentSurface, currentMixId) }
         }
         publish()
     }
@@ -248,38 +344,50 @@ class Media3Player(
         val pos = current.currentPosition.coerceAtLeast(0L)
         if (current.isPlaying) {
             current.pause()
-            if (track != null) events.pause(track, currentSurface, pos)
+            if (track != null) events.pause(track, currentSurface, pos, currentMixId)
         } else {
             current.play()
-            if (track != null) events.resume(track, currentSurface, pos)
+            if (track != null) events.resume(track, currentSurface, pos, currentMixId)
         }
     }
 
     fun next() {
         val current = controller ?: return
         val curIdx = current.currentMediaItemIndex
-        queue.getOrNull(curIdx)?.let {
-            events.skip(it, currentSurface, positionMs = current.currentPosition.coerceAtLeast(0L))
-        }
+        finalizeTrack(curIdx, endedNaturally = false)
         if (current.hasNextMediaItem()) {
+            val singleItem = queue.size <= 1
             current.seekToNextMediaItem()
-            queue.getOrNull(current.currentMediaItemIndex)?.let { events.play(it, currentSurface) }
+            if (singleItem) {
+                resetTrackTelemetry(0, playing = true)
+                queue.getOrNull(0)?.let { events.play(it, currentSurface, currentMixId) }
+            }
         } else if (queue.isNotEmpty()) {
+            val alreadyFirst = curIdx == 0
             current.seekToDefaultPosition(0)
-            queue.getOrNull(0)?.let { events.play(it, currentSurface) }
+            if (alreadyFirst) {
+                resetTrackTelemetry(0, playing = true)
+                queue.getOrNull(0)?.let { events.play(it, currentSurface, currentMixId) }
+            }
         }
     }
 
     fun previous() {
         val current = controller ?: return
+        val curIdx = current.currentMediaItemIndex
         if (current.currentPosition > 3_000L) {
             current.seekTo(0L)
-            queue.getOrNull(current.currentMediaItemIndex)?.let {
-                events.seek(it, currentSurface, 0L)
+            queue.getOrNull(curIdx)?.let {
+                events.seek(it, currentSurface, 0L, currentMixId)
             }
         } else if (current.hasPreviousMediaItem()) {
+            finalizeTrack(curIdx, endedNaturally = false)
+            val singleItem = queue.size <= 1
             current.seekToPreviousMediaItem()
-            queue.getOrNull(current.currentMediaItemIndex)?.let { events.play(it, currentSurface) }
+            if (singleItem) {
+                resetTrackTelemetry(0, playing = true)
+                queue.getOrNull(0)?.let { events.play(it, currentSurface, currentMixId) }
+            }
         } else {
             current.seekTo(0L)
         }
@@ -290,19 +398,23 @@ class Media3Player(
         val target = positionMs.coerceAtLeast(0L)
         current.seekTo(target)
         queue.getOrNull(current.currentMediaItemIndex)?.let {
-            events.seek(it, currentSurface, target)
+            events.seek(it, currentSurface, target, currentMixId)
         }
     }
 
     fun jumpTo(index: Int) {
         val current = controller ?: return
         if (index !in queue.indices) return
+        val curIdx = current.currentMediaItemIndex
+        finalizeTrack(curIdx, endedNaturally = false)
         playRequestedAt = SystemClock.elapsedRealtime()
         loggedReadyKey = null
         current.seekToDefaultPosition(index)
         current.play()
-        lastIndex = index
-        queue.getOrNull(index)?.let { events.play(it, currentSurface) }
+        if (curIdx == index) {
+            resetTrackTelemetry(index, playing = true)
+            queue.getOrNull(index)?.let { events.play(it, currentSurface, currentMixId) }
+        }
         publish()
     }
 
@@ -352,19 +464,25 @@ class Media3Player(
         current.repeatMode = nextMode
         if (nextMode != Player.REPEAT_MODE_OFF) {
             queue.getOrNull(current.currentMediaItemIndex)?.let {
-                events.repeat(it, currentSurface, current.currentPosition.coerceAtLeast(0L))
+                events.repeat(it, currentSurface, current.currentPosition.coerceAtLeast(0L), currentMixId)
             }
         }
         publish()
     }
 
     fun stop() {
-        controller?.run {
+        val current = controller
+        if (queue.isNotEmpty()) {
+            val idx = current?.currentMediaItemIndex ?: lastIndex
+            finalizeTrack(idx, endedNaturally = false)
+        }
+        current?.run {
             stop()
             clearMediaItems()
         }
         queue = emptyList()
         pendingQueue = null
+        resetTrackTelemetry(0, playing = false)
         _state.value = PlaybackState()
     }
 

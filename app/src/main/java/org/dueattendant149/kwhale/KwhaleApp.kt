@@ -132,7 +132,7 @@ class KwhaleApp : Application() {
                 }
                 .build(),
         )
-        events = EventTracker(api, appScope)
+        events = EventTracker(api, appScope, filesDir)
     }
 
     private fun deviceId(): String {

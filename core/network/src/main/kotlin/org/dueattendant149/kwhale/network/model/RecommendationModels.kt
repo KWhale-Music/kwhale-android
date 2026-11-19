@@ -26,6 +26,7 @@ data class Mix(
 data class TrackRecommendation(
     val track: Track,
     val reason: String? = null,
+    val reasonCode: String? = null,
     val score: Double? = null,
 )
 

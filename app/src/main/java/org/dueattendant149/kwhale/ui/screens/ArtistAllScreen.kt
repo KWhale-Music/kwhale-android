@@ -203,12 +203,12 @@ private fun ArtistTracks(
                 api = app.api,
                 liked = isLiked,
                 isCurrent = playerState.current?.remoteId == track.id,
-                onClick = { app.player.playQueue(items.map { it.toUi(app.api) }, index) },
+                onClick = { app.player.playQueue(items.map { it.toUi(app.api) }, index, surface = "artist") },
                 onToggleLike = {
                     app.reactions.toggleLike(
                         track = track,
                         api = app.api,
-                        surface = "artist_all",
+                        surface = "artist",
                         onError = { msg -> scope.launch { snackbarHost?.showSnackbar(msg) } },
                     )
                 },

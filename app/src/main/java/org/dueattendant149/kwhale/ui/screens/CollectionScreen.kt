@@ -730,6 +730,12 @@ fun CollectionScreen(
                         }
                     }
                     item {
+                        val collectionSurface = when (kind) {
+                            "album" -> "album"
+                            "artist" -> "artist"
+                            "playlist" -> "playlist"
+                            else -> "library"
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -737,7 +743,11 @@ fun CollectionScreen(
                             Button(
                                 onClick = {
                                     if (tracks.isNotEmpty()) {
-                                        app.player.playQueue(tracks.map { it.toUi(app.api) }, 0)
+                                        app.player.playQueue(
+                                            tracks.map { it.toUi(app.api) },
+                                            0,
+                                            surface = collectionSurface,
+                                        )
                                     }
                                 },
                                 enabled = tracks.isNotEmpty(),
@@ -753,6 +763,7 @@ fun CollectionScreen(
                                         app.player.playQueue(
                                             tracks.shuffled().map { it.toUi(app.api) },
                                             0,
+                                            surface = collectionSurface,
                                         )
                                     }
                                 },
@@ -778,17 +789,29 @@ fun CollectionScreen(
                     }
                     itemsIndexed(displayTracks, key = { index, track -> "${track.id}:$index" }) { index, track ->
                         val isLiked = app.reactions.isLiked(track.id, track.isLiked, likedOverrides)
+                        val collectionSurface = when (kind) {
+                            "album" -> "album"
+                            "artist" -> "artist"
+                            "playlist" -> "playlist"
+                            else -> "library"
+                        }
                         TrackRow(
                             track = track,
                             api = app.api,
                             liked = isLiked,
                             isCurrent = playerState.current?.remoteId == track.id,
-                            onClick = { app.player.playQueue(tracks.map { it.toUi(app.api) }, index) },
+                            onClick = {
+                                app.player.playQueue(
+                                    tracks.map { it.toUi(app.api) },
+                                    index,
+                                    surface = collectionSurface,
+                                )
+                            },
                             onToggleLike = {
                                 app.reactions.toggleLike(
                                     track = track,
                                     api = app.api,
-                                    surface = "collection_$kind",
+                                    surface = collectionSurface,
                                     onError = { msg -> scope.launch { snackbarHost?.showSnackbar(msg) } },
                                 )
                                 app.cache.invalidateCollection(kind, collectionId)

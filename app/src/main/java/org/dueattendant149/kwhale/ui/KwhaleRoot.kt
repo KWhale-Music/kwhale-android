@@ -454,14 +454,14 @@ fun KwhaleRoot(
                 DownloadsScreen(
                     app = app,
                     onBack = { navController.popBackStack() },
-                    onPlay = { queue, index -> app.player.playQueue(queue, index) },
+                    onPlay = { queue, index -> app.player.playQueue(queue, index, surface = "library") },
                 )
             }
             composable("history") {
                 HistoryScreen(
                     app = app,
                     onBack = { navController.popBackStack() },
-                    onPlay = { queue, index -> app.player.playQueue(queue, index) },
+                    onPlay = { queue, index -> app.player.playQueue(queue, index, surface = "home") },
                     onTrackMenu = { menuTrack = it },
                 )
             }
