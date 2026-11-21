@@ -1,8 +1,14 @@
+---
+verified at: 2026-11-21
+owns: kwhale-android/
+breaks if: меняются модули, конфигурация Gradle или deep links
+---
+
 # KWhale — Android-клиент
 
 Переосмысление музыкального плеера на современном стеке: **Jetpack Compose + Material 3**, в связке с self-hosted музыкальным сервером **KWhale v3** (FastAPI + PostgreSQL, 9 внешних источников).
 
-> UI — **Jetpack Compose + Material 3** (полный переход с Views/XML завершён). Тема: DARK / LIGHT / AMOLED / Monet + 129 акцентов.
+> UI — **Jetpack Compose + Material 3** (полный переход с Views/XML завершён). Тема: DARK / LIGHT / AMOLED / Monet + 129 акцентов. Реализован шеринг треков, альбомов и исполнителей (`ShareSheet` + deep links `kwhale://track|album|artist|share`).
 
 ## Стек
 
@@ -40,16 +46,17 @@ export JAVA_HOME=<jdk-17> ANDROID_HOME=<android-sdk>
 # release (R8 + resource-shrink → ~11 МБ APK)
 ./gradlew :app:assembleRelease
 
-# тесты сетевого слоя
-./gradlew :core:network:testDebugUnitTest
+# тесты сетевого слоя (при ограниченной RAM — без демона и max 2 workers)
+./gradlew :core:network:testDebugUnitTest --no-daemon -Dorg.gradle.workers.max=2
 ```
 
 ## Конфигурация
 
 - `API_BASE_URL` задаётся в `app/build.gradle.kts` через `buildConfigField`:
-  - debug → `http://127.0.0.1:19001/v1` (через `adb reverse tcp:19001 tcp:19001`)
+  - debug → `http://192.168.1.229:19001/v1` (внутренний LAN-dev хост; либо поменять на `127.0.0.1` с `adb reverse`)
   - release → `https://music.dueattendant149.org/v1`
-- Сетевая безопасность (`res/xml/network_security_config.xml`): cleartext разрешён только для локального dev-сервера (`127.0.0.1`, `10.0.2.2`); публичный API — TLS.
+- Сетевая безопасность (`res/xml/network_security_config.xml`): cleartext разрешён только для локальных/LAN dev-адресов (`127.0.0.1`, `localhost`, `10.0.2.2`, `192.168.1.229`, `192.168.1.119`); публичный API — только HTTPS.
+- Deep links (`AndroidManifest.xml`, `MainActivity`): `kwhale://track/{id}`, `kwhale://album/{id}`, `kwhale://artist/{id}`, `kwhale://share/{id}`.
 
 ## Сервер
 

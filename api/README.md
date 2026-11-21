@@ -1,9 +1,15 @@
+---
+verified at: 2026-11-21
+owns: kwhale-android/api/openapi.yaml
+breaks if: меняется версия или маршруты openapi.yaml
+---
+
 # KWhale Core API — контракт
 
-Системная спецификация KWhale v1: [`../../kwhale-v3/docs/KWHALE_V1_SPEC.md`](../../kwhale-v3/docs/KWHALE_V1_SPEC.md).
+Системная спецификация KWhale v1: [`../../kwhale-v3/docs/KWHALE_V1_SPEC.md`](../../kwhale-v3/docs/KWHALE_V1_SPEC.md) · шеринг `/share`: [`../../kwhale-v3/docs/SHARE_SPEC.md`](../../kwhale-v3/docs/SHARE_SPEC.md).
 
 `openapi.yaml` — единственный источник истины для клиента и KWhale-v3.
-Версия: **0.2.0** (Core music, 41 path).
+Версия: **0.2.0** (Core music + Share + Recommendations, **56 paths / 64 schemas**).
 
 ## 1. Один origin
 
@@ -11,12 +17,13 @@
 Любой другой host — ошибка клиента.
 
 - обложки/аватары — `ImageRef`, клиент грузит `GET /images/{id}`;
-- аудио — `GET /tracks/{id}/stream`, без 302 на внешний CDN;
+- аудио — `GET` и `HEAD /tracks/{id}/stream`, без 302 на внешний CDN;
 - скачивание — `GET /tracks/{id}/download`, тот же origin, всегда байты файла;
 - тексты — `GET /tracks/{id}/lyrics`;
 - загрузка своего аудио — `POST /uploads/tracks`;
+- шеринг с веб-превью (на том же origin `/share/s/{id}`) — `POST /share`, `GET /share/{shareId}`;
 - рекомендации, поиск, события — только через этот API;
-- в JSON **нет** абсолютных `http(s)://` URL. Только `ImageRef` и пути.
+- в JSON API **нет** прямых CDN-ссылок третьих сторон: обложки/аудио и share-превью идут с origin KWhale.
 
 ## 2. Авторизация
 
@@ -67,10 +74,10 @@ RFC 7807, `application/problem+json`:
 
 ### Аудио
 
-- `GET /tracks/{id}/stream` — `audio/mpeg|mp4|ogg|flac`, `Accept-Ranges: bytes`;
+- `GET` и `HEAD /tracks/{id}/stream` — `audio/mpeg|mp4|ogg|flac`, `Accept-Ranges: bytes`, `Content-Disposition: inline`;
 - `Range` → `206 Partial Content`;
-- без redirect на внешний host;
-- `Cache-Control: private, max-age=0`.
+- авторизация Bearer JWT или короткоживущей HMAC-подписью `?exp=&sig=`;
+- без redirect на внешний host.
 
 ### Скачивание
 
