@@ -265,6 +265,16 @@ class Media3Player(
         if (current == null) {
             pendingQueue = tracks
             pendingIndex = startIndex
+            // Publish optimistic buffering state before MediaController finishes binding
+            // so cold-start deep links do not immediately collapse the full-screen player.
+            val safeIndex = startIndex.coerceIn(0, tracks.lastIndex)
+            _state.value = PlaybackState(
+                queue = tracks,
+                index = safeIndex,
+                isPlaying = false,
+                isBuffering = true,
+                durationMs = tracks[safeIndex].durationSec * 1000L,
+            )
             return
         }
         pendingQueue = null

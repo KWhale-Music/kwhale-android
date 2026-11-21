@@ -94,6 +94,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
 import org.dueattendant149.kwhale.data.toUi
@@ -160,6 +162,7 @@ fun KwhaleRoot(
     var menuTrack by remember { mutableStateOf<ApiTrack?>(null) }
     var addToPlaylistTrack by remember { mutableStateOf<ApiTrack?>(null) }
     var shareTarget by remember { mutableStateOf<ShareTarget?>(null) }
+    var deepLinkJob by remember { mutableStateOf<Job?>(null) }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
@@ -212,39 +215,51 @@ fun KwhaleRoot(
         val host = parsed.host?.lowercase().orEmpty()
         val firstSeg = parsed.pathSegments.firstOrNull()?.trim().orEmpty()
         if (parsed.scheme == "kwhale" && firstSeg.isNotBlank()) {
-            val (kind, targetId) = if (host == "share") {
-                val resolved = runCatching { app.api.shareDetails(firstSeg) }.getOrNull()
-                if (resolved == null) {
-                    showMessage("Ссылка не найдена или устарела")
-                    return@LaunchedEffect
+            // Run on composition-lifetime scope so clearing deepLinkUri via onDeepLinkHandled()
+            // does not cancel in-flight API calls mid-request.
+            deepLinkJob?.cancel()
+            deepLinkJob = scope.launch {
+                suspend fun <T> safeCall(block: suspend () -> T): T? = try {
+                    block()
+                } catch (ce: CancellationException) {
+                    throw ce
+                } catch (_: Throwable) {
+                    null
                 }
-                resolved.kind to resolved.entityId
-            } else {
-                val parsedKind = when (host) {
-                    "track" -> ShareKind.TRACK
-                    "album" -> ShareKind.ALBUM
-                    "artist" -> ShareKind.ARTIST
-                    else -> null
-                } ?: return@LaunchedEffect
-                parsedKind to firstSeg
-            }
-            when (kind) {
-                ShareKind.TRACK -> {
-                    val apiTrack = runCatching { app.api.track(targetId) }.getOrNull()
-                    if (apiTrack == null) {
-                        showMessage("Трек не найден")
-                    } else {
-                        app.player.playQueue(listOf(apiTrack.toUi(app.api)), 0, surface = "external")
-                        showPlayer = true
+                val (kind, targetId) = if (host == "share") {
+                    val resolved = safeCall { app.api.shareDetails(firstSeg) }
+                    if (resolved == null) {
+                        showMessage("Ссылка не найдена или устарела")
+                        return@launch
                     }
+                    resolved.kind to resolved.entityId
+                } else {
+                    val parsedKind = when (host) {
+                        "track" -> ShareKind.TRACK
+                        "album" -> ShareKind.ALBUM
+                        "artist" -> ShareKind.ARTIST
+                        else -> null
+                    } ?: return@launch
+                    parsedKind to firstSeg
                 }
-                ShareKind.ALBUM -> {
-                    showPlayer = false
-                    navController.navigate("collection/album/$targetId") { launchSingleTop = true }
-                }
-                ShareKind.ARTIST -> {
-                    showPlayer = false
-                    navController.navigate("collection/artist/$targetId") { launchSingleTop = true }
+                when (kind) {
+                    ShareKind.TRACK -> {
+                        val apiTrack = safeCall { app.api.track(targetId) }
+                        if (apiTrack == null) {
+                            showMessage("Трек не найден")
+                        } else {
+                            app.player.playQueue(listOf(apiTrack.toUi(app.api)), 0, surface = "external")
+                            showPlayer = true
+                        }
+                    }
+                    ShareKind.ALBUM -> {
+                        showPlayer = false
+                        navController.navigate("collection/album/$targetId") { launchSingleTop = true }
+                    }
+                    ShareKind.ARTIST -> {
+                        showPlayer = false
+                        navController.navigate("collection/artist/$targetId") { launchSingleTop = true }
+                    }
                 }
             }
         }
