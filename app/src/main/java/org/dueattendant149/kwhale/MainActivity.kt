@@ -30,15 +30,27 @@ class MainActivity : ComponentActivity() {
     private lateinit var app: KwhaleApp
     private var openQueue by mutableStateOf(false)
     private var openPlayer by mutableStateOf(false)
+    private var pendingDeepLink by mutableStateOf<String?>(null)
+
+    private fun extractDeepLink(src: Intent?): String? {
+        val extra = src?.getStringExtra(EXTRA_DEEP_LINK_URI)
+        if (!extra.isNullOrBlank()) return extra
+        if (src?.action == Intent.ACTION_VIEW && src.data != null) {
+            return src.data.toString()
+        }
+        return null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         app = application as KwhaleApp
         openQueue = intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)
         openPlayer = intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)
+        pendingDeepLink = extractDeepLink(intent)
         if (app.api.session() == null) {
             startActivity(
                 Intent(this, AuthActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                    pendingDeepLink?.let { putExtra(EXTRA_DEEP_LINK_URI, it) }
                 },
             )
             finish()
@@ -87,6 +99,8 @@ class MainActivity : ComponentActivity() {
                     onQueueOpened = { openQueue = false },
                     openPlayer = openPlayer,
                     onPlayerOpened = { openPlayer = false },
+                    deepLinkUri = pendingDeepLink,
+                    onDeepLinkHandled = { pendingDeepLink = null },
                 )
             }
         }
@@ -97,6 +111,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         openQueue = intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)
         openPlayer = intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)
+        extractDeepLink(intent)?.let { pendingDeepLink = it }
     }
 
     private fun requestNotificationPermission() {
@@ -124,5 +139,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_OPEN_QUEUE = "org.dueattendant149.kwhale.OPEN_QUEUE"
         const val EXTRA_OPEN_PLAYER = "org.dueattendant149.kwhale.OPEN_PLAYER"
+        const val EXTRA_DEEP_LINK_URI = "org.dueattendant149.kwhale.DEEP_LINK_URI"
     }
 }

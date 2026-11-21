@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -97,7 +98,9 @@ import org.dueattendant149.kwhale.download.Downloads
 import org.dueattendant149.kwhale.download.TrackDownloadStatus
 import org.dueattendant149.kwhale.network.model.Album
 import org.dueattendant149.kwhale.network.model.PlaylistUpdate
+import org.dueattendant149.kwhale.network.model.ShareKind
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
+import org.dueattendant149.kwhale.ui.sheets.ShareTarget
 import org.dueattendant149.kwhale.ui.components.AlbumCard
 import org.dueattendant149.kwhale.ui.components.BlurredCoverBackground
 import org.dueattendant149.kwhale.ui.components.CoverArt
@@ -123,6 +126,7 @@ fun CollectionScreen(
     onOpenCollection: (String, String) -> Unit,
     onTrackMenu: (ApiTrack) -> Unit,
     onOpenArtistAll: (String) -> Unit = {},
+    onShare: (ShareTarget) -> Unit = {},
 ) {
     val cacheKey = ContentCache.collection(kind, collectionId)
     val cached = remember(kind, collectionId) {
@@ -387,6 +391,24 @@ fun CollectionScreen(
 
     Box(Modifier.fillMaxSize()) {
         BlurredCoverBackground(cover)
+        fun triggerCollectionShare() {
+            if ((kind != "album" && kind != "artist") || title.isBlank()) return
+            val shareKind = if (kind == "artist") ShareKind.ARTIST else ShareKind.ALBUM
+            val fb = if (kind == "album" && subtitle.isNotBlank()) "$subtitle — $title" else title
+            onShare(
+                ShareTarget(
+                    kind = shareKind,
+                    id = collectionId,
+                    title = title,
+                    subtitle = subtitle.ifBlank { null },
+                    meta = meta.ifBlank { null },
+                    coverUrl = cover,
+                    fallbackText = fb,
+                    surface = kind,
+                ),
+            )
+        }
+
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Surface(
                 color = if (showPinnedTitle || editingTracks) {
@@ -467,6 +489,11 @@ fun CollectionScreen(
                         }
                         if (!showPinnedTitle) {
                             Spacer(Modifier.weight(1f))
+                        }
+                        if ((kind == "album" || kind == "artist") && title.isNotBlank() && !loading && error == null) {
+                            IconButton(onClick = { triggerCollectionShare() }) {
+                                Icon(Icons.Rounded.Share, contentDescription = "Поделиться")
+                            }
                         }
                         if (kind == "playlist" && canEdit && !loading && error == null) {
                             Box {
@@ -698,6 +725,14 @@ fun CollectionScreen(
                                     label = if (offlineActiveCount > 0) "Загрузка ($offlineActiveCount)" else "Скачать",
                                     enabled = !actionBusy && tracks.isNotEmpty(),
                                     onClick = { showDownloadSheet = true },
+                                )
+                            }
+                            if (kind == "album" || kind == "artist") {
+                                ActionItem(
+                                    icon = Icons.Rounded.Share,
+                                    label = "Поделиться",
+                                    enabled = title.isNotBlank() && !actionBusy,
+                                    onClick = { triggerCollectionShare() },
                                 )
                             }
                         }

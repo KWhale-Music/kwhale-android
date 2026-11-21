@@ -10,6 +10,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
 import org.dueattendant149.kwhale.network.model.Session
+import org.dueattendant149.kwhale.network.model.ShareKind
 import org.dueattendant149.kwhale.network.model.User
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -348,5 +349,76 @@ class KwhaleApiTest {
         val deleteRequest = server.takeRequest()
         assertEquals("DELETE", deleteRequest.method)
         assertTrue(deleteRequest.path.orEmpty().endsWith("/tracks/track_99/censorship"))
+    }
+
+    @Test
+    fun createsAndResolvesShareLinks() = runBlocking {
+        val shareJson = """
+            {
+              "id": "b8b9f730",
+              "kind": "album",
+              "entityId": "42",
+              "title": "Этажи",
+              "subtitle": "Молчат Дома",
+              "meta": "2018 · 9 треков",
+              "imageId": "img_42",
+              "shareUrl": "https://music.dueattendant149.org/share/s/b8b9f730",
+              "cardUrl": "https://music.dueattendant149.org/share/card/b8b9f730.png",
+              "coverUrl": "https://music.dueattendant149.org/share/cover/b8b9f730",
+              "deepLink": "kwhale://album/42",
+              "expiresAt": "2026-11-28T19:00:00Z",
+              "ttlDays": 7,
+              "clicksTotal": 0,
+              "platforms": [
+                {
+                  "platform": "apple",
+                  "label": "Apple Music",
+                  "url": "https://music.apple.com/album/1484820476",
+                  "goUrl": "https://music.dueattendant149.org/share/go/b8b9f730/apple",
+                  "exact": true
+                }
+              ]
+            }
+        """.trimIndent()
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(shareJson),
+        )
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(shareJson),
+        )
+
+        val session = Session(
+            accessToken = "access",
+            refreshToken = "refresh",
+            expiresAtEpochSec = Long.MAX_VALUE,
+            user = User(id = "user_1", displayName = "Demo"),
+        )
+        val api = ApiFactory.createInMemory(config(), session)
+
+        val created = api.createShare(ShareKind.ALBUM, "42")
+        assertEquals("b8b9f730", created.id)
+        assertEquals(ShareKind.ALBUM, created.kind)
+        assertEquals("kwhale://album/42", created.deepLink)
+        assertEquals(1, created.platforms.size)
+        assertTrue(created.platforms.first().exact)
+
+        val postReq = server.takeRequest()
+        assertEquals("POST", postReq.method)
+        assertTrue(postReq.path.orEmpty().endsWith("/share"))
+        val body = postReq.body.readUtf8()
+        assertTrue(body.contains("\"kind\":\"album\""))
+        assertTrue(body.contains("\"id\":\"42\""))
+
+        val resolved = api.shareDetails("b8b9f730")
+        assertEquals("42", resolved.entityId)
+        val getReq = server.takeRequest()
+        assertEquals("GET", getReq.method)
+        assertTrue(getReq.path.orEmpty().endsWith("/share/b8b9f730"))
     }
 }

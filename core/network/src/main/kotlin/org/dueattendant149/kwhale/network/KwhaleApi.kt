@@ -36,6 +36,9 @@ import org.dueattendant149.kwhale.network.model.RegisterRequest
 import org.dueattendant149.kwhale.network.model.SearchHistory
 import org.dueattendant149.kwhale.network.model.SearchResponse
 import org.dueattendant149.kwhale.network.model.Session
+import org.dueattendant149.kwhale.network.model.ShareCreateRequest
+import org.dueattendant149.kwhale.network.model.ShareKind
+import org.dueattendant149.kwhale.network.model.ShareLink
 import org.dueattendant149.kwhale.network.model.Suggestions
 import org.dueattendant149.kwhale.network.model.Track
 import org.dueattendant149.kwhale.network.model.TrackInfo
@@ -421,6 +424,18 @@ class KwhaleApi(
     suspend fun config(): Config = client.get("/config", Config.serializer())
 
     suspend fun health(): HealthResponse = client.get("/health", HealthResponse.serializer())
+
+    // ---- share ------------------------------------------------------------
+
+    suspend fun createShare(kind: ShareKind, id: String): ShareLink =
+        client.post(
+            "/share",
+            json.encodeToString(ShareCreateRequest.serializer(), ShareCreateRequest(kind = kind, id = id)),
+            ShareLink.serializer(),
+        )
+
+    suspend fun shareDetails(shareId: String): ShareLink =
+        client.get("/share/$shareId", ShareLink.serializer())
 
     suspend fun uploadPlaylistCover(id: String, file: java.io.File, mimeType: String = "image/jpeg"): Playlist =
         client.postMultipart(

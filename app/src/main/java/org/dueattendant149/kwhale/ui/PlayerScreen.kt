@@ -127,6 +127,7 @@ fun PlayerScreen(
     onLyrics: () -> Unit,
     onQueue: () -> Unit,
     onMenu: (ApiTrack) -> Unit,
+    onShare: (org.dueattendant149.kwhale.model.Track) -> Unit,
 ) {
     val track = state.current ?: return
     val context = LocalContext.current
@@ -222,7 +223,7 @@ fun PlayerScreen(
                     )
                 }
             }
-            IconButton(onClick = { shareTrack(app, context, track) }) {
+            IconButton(onClick = { onShare(track) }) {
                 Icon(
                     Icons.Rounded.Share,
                     contentDescription = "Поделиться",
@@ -931,19 +932,4 @@ private fun PlayerBackground(coverUrl: String?, seed: String, isLight: Boolean) 
 private fun formatVkTime(ms: Long): String {
     val total = (ms / 1000L).toInt().coerceAtLeast(0)
     return "%02d:%02d".format(total / 60, total % 60)
-}
-
-private fun shareTrack(app: KwhaleApp, context: android.content.Context, track: org.dueattendant149.kwhale.model.Track) {
-    app.events.share(track, "player")
-    val text = buildString {
-        append(track.artist)
-        append(" — ")
-        append(track.title)
-        track.album?.let { append(" (").append(it).append(")") }
-    }
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, "Поделиться"))
 }

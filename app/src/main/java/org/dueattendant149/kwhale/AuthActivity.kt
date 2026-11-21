@@ -87,9 +87,13 @@ class AuthActivity : ComponentActivity() {
     }
 
     private fun openMain() {
+        val pendingDeepLink = intent.getStringExtra(MainActivity.EXTRA_DEEP_LINK_URI)
         startActivity(
             Intent(this, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                if (!pendingDeepLink.isNullOrBlank()) {
+                    putExtra(MainActivity.EXTRA_DEEP_LINK_URI, pendingDeepLink)
+                }
             },
         )
         finish()

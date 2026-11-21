@@ -34,9 +34,20 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="false"
+            android:exported="true"
+            android:launchMode="singleTop"
             android:configChanges="screenSize|uiMode|orientation|keyboardHidden|keyboard"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kwhale" android:host="track" />
+                <data android:scheme="kwhale" android:host="album" />
+                <data android:scheme="kwhale" android:host="artist" />
+                <data android:scheme="kwhale" android:host="share" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".player.PlaybackService"

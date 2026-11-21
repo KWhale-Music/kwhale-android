@@ -248,19 +248,27 @@ paths:
     get:
       tags: [Tracks]
       operationId: streamTrack
-      summary: Аудиопоток. Только этот origin, без redirect на внешний CDN.
+      summary: Аудиопоток (inline). Поддерживает Bearer JWT или HMAC-подпись (?exp=&sig=).
       parameters:
         - { $ref: '#/components/parameters/TrackId' }
         - name: Range
           in: header
           required: false
           schema: { type: string, example: bytes=0-1023 }
+        - name: exp
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: sig
+          in: query
+          required: false
+          schema: { type: string }
       responses:
         '200':
           description: Аудио
           headers:
             Accept-Ranges: { schema: { type: string, example: bytes } }
-            Cache-Control: { schema: { type: string, example: private, max-age=0 } }
+            Cache-Control: { schema: { type: string, example: private, max-age=3600 } }
           content:
             audio/mpeg:
               schema: { type: string, format: binary }
@@ -281,6 +289,28 @@ paths:
               schema: { type: string, format: binary }
             audio/flac:
               schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+    head:
+      tags: [Tracks]
+      operationId: headTrackStream
+      summary: Заголовки и размер аудиопотока без передачи тела.
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+        - name: Range
+          in: header
+          required: false
+          schema: { type: string, example: bytes=0-1023 }
+        - name: exp
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: sig
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200': { description: Заголовки полного потока }
+        '206': { description: Заголовки Range-среза }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /tracks/{trackId}/download:
@@ -1110,6 +1140,46 @@ paths:
                 properties:
                   status: { type: string, example: ok }
 
+  /share:
+    post:
+      summary: Создать или продлить каноническую короткую ссылку на трек, альбом или исполнителя (TTL 7 дней)
+      tags: [Share]
+      operationId: createShare
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShareCreateRequest' }
+      responses:
+        '200':
+          description: Активная короткая ссылка
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShareLink' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /share/{shareId}:
+    get:
+      summary: Разрешить короткий идентификатор шеринга в сущность KWhale
+      tags: [Share]
+      operationId: getShareDetails
+      parameters:
+        - { $ref: '#/components/parameters/ShareId' }
+      responses:
+        '200':
+          description: Детали короткой ссылки
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShareLink' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410':
+          description: Срок действия ссылки истёк
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1155,6 +1225,11 @@ components:
       schema: { type: string }
     MixId:
       name: mixId
+      in: path
+      required: true
+      schema: { type: string }
+    ShareId:
+      name: shareId
       in: path
       required: true
       schema: { type: string }
@@ -1864,3 +1939,46 @@ components:
               type: array
               items: { type: string }
             streamChunkSize: { type: integer }
+
+    ShareKind:
+      type: string
+      enum: [track, album, artist]
+
+    SharePlatformLink:
+      type: object
+      required: [platform, label, url, goUrl, exact]
+      properties:
+        platform: { type: string }
+        label: { type: string }
+        url: { type: string, format: uri }
+        goUrl: { type: string, format: uri }
+        exact: { type: boolean }
+
+    ShareCreateRequest:
+      type: object
+      required: [kind, id]
+      properties:
+        kind: { $ref: '#/components/schemas/ShareKind' }
+        id: { type: string }
+
+    ShareLink:
+      type: object
+      required: [id, kind, entityId, title, imageId, shareUrl, cardUrl, coverUrl, deepLink, expiresAt, ttlDays, clicksTotal, platforms]
+      properties:
+        id: { type: string }
+        kind: { $ref: '#/components/schemas/ShareKind' }
+        entityId: { type: string }
+        title: { type: string }
+        subtitle: { type: string, nullable: true }
+        meta: { type: string, nullable: true }
+        imageId: { type: string }
+        shareUrl: { type: string, format: uri }
+        cardUrl: { type: string, format: uri }
+        coverUrl: { type: string, format: uri }
+        deepLink: { type: string }
+        expiresAt: { type: string, format: date-time }
+        ttlDays: { type: integer }
+        clicksTotal: { type: integer, format: int64 }
+        platforms:
+          type: array
+          items: { $ref: '#/components/schemas/SharePlatformLink' }

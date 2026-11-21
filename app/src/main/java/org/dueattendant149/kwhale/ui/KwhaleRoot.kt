@@ -1,6 +1,6 @@
 package org.dueattendant149.kwhale.ui
 
-import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -105,6 +105,7 @@ import org.dueattendant149.kwhale.design.rememberReducedMotionEnabled
 import org.dueattendant149.kwhale.download.Downloads
 import org.dueattendant149.kwhale.model.Track as UiTrack
 import org.dueattendant149.kwhale.network.model.Playlist
+import org.dueattendant149.kwhale.network.model.ShareKind
 import org.dueattendant149.kwhale.network.model.Track as ApiTrack
 import org.dueattendant149.kwhale.BuildConfig
 import org.dueattendant149.kwhale.ui.components.AppUpdateDialog
@@ -126,6 +127,8 @@ import org.dueattendant149.kwhale.ui.screens.SearchScreen
 import org.dueattendant149.kwhale.ui.screens.SettingsScreen
 import org.dueattendant149.kwhale.ui.sheets.LyricsSheet
 import org.dueattendant149.kwhale.ui.sheets.QueueSheet
+import org.dueattendant149.kwhale.ui.sheets.ShareSheet
+import org.dueattendant149.kwhale.ui.sheets.ShareTarget
 import org.dueattendant149.kwhale.ui.sheets.TrackMenuSheet
 
 private val tabRoutes = setOf("home", "search", "library", "profile")
@@ -143,6 +146,8 @@ fun KwhaleRoot(
     onQueueOpened: () -> Unit = {},
     openPlayer: Boolean = false,
     onPlayerOpened: () -> Unit = {},
+    deepLinkUri: String? = null,
+    onDeepLinkHandled: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val playerState by app.player.state.collectAsState()
@@ -154,6 +159,7 @@ fun KwhaleRoot(
     var showLyrics by remember { mutableStateOf(false) }
     var menuTrack by remember { mutableStateOf<ApiTrack?>(null) }
     var addToPlaylistTrack by remember { mutableStateOf<ApiTrack?>(null) }
+    var shareTarget by remember { mutableStateOf<ShareTarget?>(null) }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
@@ -197,6 +203,50 @@ fun KwhaleRoot(
         if (openPlayer) {
             showPlayer = true
             onPlayerOpened()
+        }
+    }
+    LaunchedEffect(deepLinkUri) {
+        val raw = deepLinkUri ?: return@LaunchedEffect
+        onDeepLinkHandled()
+        val parsed = runCatching { Uri.parse(raw) }.getOrNull() ?: return@LaunchedEffect
+        val host = parsed.host?.lowercase().orEmpty()
+        val firstSeg = parsed.pathSegments.firstOrNull()?.trim().orEmpty()
+        if (parsed.scheme == "kwhale" && firstSeg.isNotBlank()) {
+            val (kind, targetId) = if (host == "share") {
+                val resolved = runCatching { app.api.shareDetails(firstSeg) }.getOrNull()
+                if (resolved == null) {
+                    showMessage("Ссылка не найдена или устарела")
+                    return@LaunchedEffect
+                }
+                resolved.kind to resolved.entityId
+            } else {
+                val parsedKind = when (host) {
+                    "track" -> ShareKind.TRACK
+                    "album" -> ShareKind.ALBUM
+                    "artist" -> ShareKind.ARTIST
+                    else -> null
+                } ?: return@LaunchedEffect
+                parsedKind to firstSeg
+            }
+            when (kind) {
+                ShareKind.TRACK -> {
+                    val apiTrack = runCatching { app.api.track(targetId) }.getOrNull()
+                    if (apiTrack == null) {
+                        showMessage("Трек не найден")
+                    } else {
+                        app.player.playQueue(listOf(apiTrack.toUi(app.api)), 0, surface = "external")
+                        showPlayer = true
+                    }
+                }
+                ShareKind.ALBUM -> {
+                    showPlayer = false
+                    navController.navigate("collection/album/$targetId") { launchSingleTop = true }
+                }
+                ShareKind.ARTIST -> {
+                    showPlayer = false
+                    navController.navigate("collection/artist/$targetId") { launchSingleTop = true }
+                }
+            }
         }
     }
     // In-app updater: silent check at startup; the dialog appears only when a
@@ -486,6 +536,7 @@ fun KwhaleRoot(
                     onOpenArtistAll = { tab ->
                         navController.navigate("artist/$collectionId/$tab")
                     },
+                    onShare = { shareTarget = it },
                 )
             }
             composable("artist/{id}/tracks") { entry ->
@@ -557,6 +608,22 @@ fun KwhaleRoot(
                 onLyrics = { showLyrics = true },
                 onQueue = { showQueue = true },
                 onMenu = { menuTrack = it },
+                onShare = { t ->
+                    shareTarget = ShareTarget(
+                        kind = ShareKind.TRACK,
+                        id = t.remoteId.orEmpty(),
+                        title = t.title,
+                        subtitle = t.artist,
+                        meta = t.album,
+                        coverUrl = t.coverUrl,
+                        fallbackText = buildString {
+                            append(t.artist).append(" — ").append(t.title)
+                            t.album?.let { append(" (").append(it).append(")") }
+                        },
+                        surface = "player",
+                        analyticsTrack = t,
+                    )
+                },
             )
         }
     }
@@ -610,7 +677,24 @@ fun KwhaleRoot(
                     showPlayer = false
                     navController.navigate("collection/album/$id")
                 },
-                onShare = { shareTrack(app, context, track) },
+                onShare = {
+                    val artistLine = track.artistLine()
+                    menuTrack = null
+                    shareTarget = ShareTarget(
+                        kind = ShareKind.TRACK,
+                        id = track.id,
+                        title = track.title,
+                        subtitle = artistLine,
+                        meta = track.album?.title,
+                        coverUrl = track.imageUrl(app.api),
+                        fallbackText = buildString {
+                            append(artistLine).append(" — ").append(track.title)
+                            track.album?.title?.let { append(" (").append(it).append(")") }
+                        },
+                        surface = "track_menu",
+                        analyticsTrack = track.toUi(app.api),
+                    )
+                },
                 onDownload = {
                     val ui = track.toUi(app.api)
                     Downloads.enqueue(context, ui)
@@ -635,6 +719,20 @@ fun KwhaleRoot(
                     showMessage("Добавлено в плейлист")
                     addToPlaylistTrack = null
                 },
+            )
+        }
+    }
+
+    shareTarget?.let { target ->
+        ModalBottomSheet(
+            onDismissRequest = { shareTarget = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            ShareSheet(
+                app = app,
+                target = target,
+                onDismiss = { shareTarget = null },
+                onMessage = ::showMessage,
             )
         }
     }
@@ -971,21 +1069,6 @@ private fun AddToPlaylistSheet(
             },
         )
     }
-}
-
-private fun shareTrack(app: KwhaleApp, context: android.content.Context, track: ApiTrack) {
-    app.events.share(track.toUi(app.api), "track_menu")
-    val text = buildString {
-        append(track.artistLine())
-        append(" — ")
-        append(track.title)
-        track.album?.title?.let { append(" (").append(it).append(")") }
-    }
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, "Поделиться"))
 }
 
 private fun NavHostController.navigateTop(route: String) {
