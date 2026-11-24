@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -80,6 +79,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -179,6 +179,12 @@ fun CollectionScreen(
     val singlesAndEps = albums.filter { isSingleLike(it) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val albumGridCols = when {
+        screenWidthDp >= 840 -> 4
+        screenWidthDp >= 600 -> 3
+        else -> 2
+    }
 
     val offlineDownloadedCount = remember(tracks, downloadStatuses) {
         tracks.count { downloadStatuses[it.id] is TrackDownloadStatus.Downloaded }
@@ -643,7 +649,7 @@ fun CollectionScreen(
                             CoverArt(
                                 imageUrl = cover,
                                 modifier = Modifier.size(if (kind == "artist") 220.dp else 180.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(if (kind == "artist") 28.dp else 16.dp),
                                 iconSize = 44,
                                 seed = title,
                                 titleText = if (kind == "playlist") title else null,
@@ -862,31 +868,47 @@ fun CollectionScreen(
                         )
                     }
                     if (albums.isNotEmpty() || kind == "artist") {
-                        item {
-                            SectionHeader(
-                                title = "Альбомы",
-                                action = if (kind == "artist") "Все" else null,
-                                onAction = if (kind == "artist") {
-                                    { onOpenArtistAll("albums") }
-                                } else {
-                                    null
-                                },
-                            )
-                        }
-                        if (fullAlbums.isNotEmpty()) {
+                        val gridCols = albumGridCols
+                        val previewLimit = gridCols * 3
+
+                        if (fullAlbums.isNotEmpty() || singlesAndEps.isEmpty()) {
                             item {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(fullAlbums.take(5), key = { it.id }) { album ->
-                                        AlbumCard(
-                                            album = album,
-                                            api = app.api,
-                                            onClick = { onOpenCollection("album", album.id) },
-                                            onArtistClick = {
-                                                album.primaryArtistId()
-                                                    ?.takeIf { kind != "artist" || it != collectionId }
-                                                    ?.let { id -> onOpenCollection("artist", id) }
-                                            },
-                                        )
+                                SectionHeader(
+                                    title = "Альбомы",
+                                    action = if (kind == "artist") "Все" else null,
+                                    onAction = if (kind == "artist") {
+                                        { onOpenArtistAll("albums") }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
+                            if (fullAlbums.isNotEmpty()) {
+                                val albumRows = fullAlbums.take(previewLimit).chunked(gridCols)
+                                items(albumRows, key = { row -> "alb:${row.first().id}" }) { rowAlbums ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 14.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        rowAlbums.forEach { album ->
+                                            AlbumCard(
+                                                album = album,
+                                                api = app.api,
+                                                onClick = { onOpenCollection("album", album.id) },
+                                                fillWidth = true,
+                                                onArtistClick = {
+                                                    album.primaryArtistId()
+                                                        ?.takeIf { kind != "artist" || it != collectionId }
+                                                        ?.let { id -> onOpenCollection("artist", id) }
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                        }
+                                        repeat(gridCols - rowAlbums.size) {
+                                            Spacer(Modifier.weight(1f))
+                                        }
                                     }
                                 }
                             }
@@ -903,19 +925,30 @@ fun CollectionScreen(
                                     },
                                 )
                             }
-                            item {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(singlesAndEps.take(5), key = { it.id }) { album ->
+                            val singleRows = singlesAndEps.take(previewLimit).chunked(gridCols)
+                            items(singleRows, key = { row -> "sng:${row.first().id}" }) { rowSingles ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 14.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    rowSingles.forEach { album ->
                                         AlbumCard(
                                             album = album,
                                             api = app.api,
                                             onClick = { onOpenCollection("album", album.id) },
+                                            fillWidth = true,
                                             onArtistClick = {
                                                 album.primaryArtistId()
                                                     ?.takeIf { kind != "artist" || it != collectionId }
                                                     ?.let { id -> onOpenCollection("artist", id) }
                                             },
+                                            modifier = Modifier.weight(1f),
                                         )
+                                    }
+                                    repeat(gridCols - rowSingles.size) {
+                                        Spacer(Modifier.weight(1f))
                                     }
                                 }
                             }

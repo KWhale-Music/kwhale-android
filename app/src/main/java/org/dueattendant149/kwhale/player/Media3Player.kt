@@ -405,8 +405,12 @@ class Media3Player(
 
     fun seekTo(positionMs: Long) {
         val current = controller ?: return
-        val target = positionMs.coerceAtLeast(0L)
+        val duration = _state.value.durationMs.takeIf { it > 0L } ?: current.duration.coerceAtLeast(0L)
+        val target = positionMs.coerceIn(0L, duration.takeIf { it > 0L } ?: Long.MAX_VALUE)
         current.seekTo(target)
+        // Optimistically update exposed position immediately so UI sliders do
+        // not snap back to the stale tick before the next 1s telemetry poll.
+        _state.value = _state.value.copy(positionMs = target)
         queue.getOrNull(current.currentMediaItemIndex)?.let {
             events.seek(it, currentSurface, target, currentMixId)
         }

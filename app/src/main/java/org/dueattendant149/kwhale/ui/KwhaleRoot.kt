@@ -1,6 +1,7 @@
 package org.dueattendant149.kwhale.ui
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -98,6 +99,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.dueattendant149.kwhale.KwhaleApp
+import org.dueattendant149.kwhale.network.ApiException
 import org.dueattendant149.kwhale.data.toUi
 import org.dueattendant149.kwhale.design.KwhaleMotion
 import org.dueattendant149.kwhale.design.KwhalePlural
@@ -131,6 +133,7 @@ import org.dueattendant149.kwhale.ui.sheets.LyricsSheet
 import org.dueattendant149.kwhale.ui.sheets.QueueSheet
 import org.dueattendant149.kwhale.ui.sheets.ShareSheet
 import org.dueattendant149.kwhale.ui.sheets.ShareTarget
+import org.dueattendant149.kwhale.ui.sheets.SharedTrackSheet
 import org.dueattendant149.kwhale.ui.sheets.TrackMenuSheet
 
 private val tabRoutes = setOf("home", "search", "library", "profile")
@@ -160,6 +163,7 @@ fun KwhaleRoot(
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
     var menuTrack by remember { mutableStateOf<ApiTrack?>(null) }
+    var sharedTrack by remember { mutableStateOf<ApiTrack?>(null) }
     var addToPlaylistTrack by remember { mutableStateOf<ApiTrack?>(null) }
     var shareTarget by remember { mutableStateOf<ShareTarget?>(null) }
     var deepLinkJob by remember { mutableStateOf<Job?>(null) }
@@ -219,19 +223,29 @@ fun KwhaleRoot(
             // does not cancel in-flight API calls mid-request.
             deepLinkJob?.cancel()
             deepLinkJob = scope.launch {
-                suspend fun <T> safeCall(block: suspend () -> T): T? = try {
+                suspend fun <T> safeCall(label: String, notFoundMsg: String, block: suspend () -> T): T? = try {
                     block()
                 } catch (ce: CancellationException) {
                     throw ce
-                } catch (_: Throwable) {
+                } catch (ae: ApiException) {
+                    Log.w("KwhaleDeepLink", "$label failed: status=${ae.statusCode} code=${ae.code} msg=${ae.message}", ae)
+                    val msg = when {
+                        ae.statusCode == 401 -> "Войдите в аккаунт для открытия ссылки"
+                        ae.statusCode == 404 || ae.statusCode == 410 -> notFoundMsg
+                        ae.statusCode >= 500 -> "Сервер временно недоступен"
+                        else -> ae.message ?: notFoundMsg
+                    }
+                    showMessage(msg)
+                    null
+                } catch (t: Throwable) {
+                    Log.w("KwhaleDeepLink", "$label network/decode error for $raw", t)
+                    showMessage("Нет связи с сервером")
                     null
                 }
                 val (kind, targetId) = if (host == "share") {
-                    val resolved = safeCall { app.api.shareDetails(firstSeg) }
-                    if (resolved == null) {
-                        showMessage("Ссылка не найдена или устарела")
-                        return@launch
-                    }
+                    val resolved = safeCall("share($firstSeg)", "Ссылка не найдена или устарела") {
+                        app.api.shareDetails(firstSeg)
+                    } ?: return@launch
                     resolved.kind to resolved.entityId
                 } else {
                     val parsedKind = when (host) {
@@ -244,13 +258,12 @@ fun KwhaleRoot(
                 }
                 when (kind) {
                     ShareKind.TRACK -> {
-                        val apiTrack = safeCall { app.api.track(targetId) }
-                        if (apiTrack == null) {
-                            showMessage("Трек не найден")
-                        } else {
-                            app.player.playQueue(listOf(apiTrack.toUi(app.api)), 0, surface = "external")
-                            showPlayer = true
-                        }
+                        val apiTrack = safeCall("track($targetId)", "Трек не найден") {
+                            app.api.track(targetId)
+                        } ?: return@launch
+                        // Show a lightweight preview sheet so opening a shared link
+                        // lets the listener choose Play / Play Next without auto-blasting.
+                        sharedTrack = apiTrack
                     }
                     ShareKind.ALBUM -> {
                         showPlayer = false
@@ -738,6 +751,43 @@ fun KwhaleRoot(
         }
     }
 
+    sharedTrack?.let { track ->
+        ModalBottomSheet(
+            onDismissRequest = { sharedTrack = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            SharedTrackSheet(
+                app = app,
+                track = track,
+                hasActiveQueue = playerState.queue.isNotEmpty(),
+                onPlayNow = {
+                    app.player.playQueue(listOf(track.toUi(app.api)), 0, surface = "external")
+                    sharedTrack = null
+                    showPlayer = true
+                },
+                onPlayNext = {
+                    app.player.playNext(track.toUi(app.api), surface = "external")
+                    sharedTrack = null
+                    showMessage("Включим следующим")
+                },
+                onOpenAlbum = { albumId ->
+                    sharedTrack = null
+                    showPlayer = false
+                    navController.navigate("collection/album/$albumId") { launchSingleTop = true }
+                },
+                onOpenArtist = { artistId ->
+                    sharedTrack = null
+                    showPlayer = false
+                    navController.navigate("collection/artist/$artistId") { launchSingleTop = true }
+                },
+                onMoreActions = {
+                    sharedTrack = null
+                    menuTrack = track
+                },
+            )
+        }
+    }
+
     shareTarget?.let { target ->
         ModalBottomSheet(
             onDismissRequest = { shareTarget = null },
@@ -771,7 +821,7 @@ private fun MiniPlayer(
     // hairline does not visibly jump.
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 900, easing = LinearEasing),
+        animationSpec = tween(durationMillis = 240, easing = LinearEasing),
         label = "miniProgress",
     )
 

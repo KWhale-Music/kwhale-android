@@ -74,6 +74,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -158,11 +159,27 @@ fun PlayerScreen(
 
     var loadingMenu by remember(track.id) { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf<Float?>(null) }
-    val smoothedProgress by animateFloatAsState(
-        targetValue = state.progress,
-        animationSpec = tween(durationMillis = 900, easing = LinearEasing),
-        label = "playerProgress",
-    )
+    val sliderAnim = remember(track.id) { Animatable(state.progress.coerceIn(0f, 1f)) }
+    LaunchedEffect(state.progress, dragValue) {
+        if (dragValue != null) {
+            sliderAnim.snapTo(dragValue!!.coerceIn(0f, 1f))
+        } else {
+            val target = state.progress.coerceIn(0f, 1f)
+            val delta = kotlin.math.abs(target - sliderAnim.value)
+            if (delta > 0.025f) {
+                // Tap-to-seek / track jump / scrub release catches up crisply instead of crawling.
+                sliderAnim.animateTo(
+                    targetValue = target,
+                    animationSpec = tween(durationMillis = 70, easing = FastOutSlowInEasing),
+                )
+            } else {
+                sliderAnim.animateTo(
+                    targetValue = target,
+                    animationSpec = tween(durationMillis = 240, easing = LinearEasing),
+                )
+            }
+        }
+    }
 
     val likedScale by animateFloatAsState(
         targetValue = if (liked) 1.15f else 1f,
@@ -461,13 +478,18 @@ fun PlayerScreen(
         Spacer(Modifier.height(KwhaleSpacing.sm))
 
         // ── progress ─────────────────────────────────────────────────────
-        val sliderValue = dragValue ?: smoothedProgress
+        val sliderValue = dragValue ?: sliderAnim.value
         Slider(
             value = sliderValue,
-            onValueChange = { dragValue = it },
+            onValueChange = { dragValue = it.coerceIn(0f, 1f) },
             onValueChangeFinished = {
-                dragValue?.let { app.player.seekTo((it * state.durationMs).toLong()) }
+                val finished = dragValue
                 dragValue = null
+                finished?.let { target ->
+                    val clamped = target.coerceIn(0f, 1f)
+                    scope.launch { sliderAnim.snapTo(clamped) }
+                    app.player.seekTo((clamped * state.durationMs).toLong())
+                }
             },
             modifier = Modifier.fillMaxWidth(),
             thumb = {

@@ -1,9 +1,11 @@
 package org.dueattendant149.kwhale.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -66,15 +68,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -676,6 +682,7 @@ fun AlbumCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     width: Int = 140,
+    fillWidth: Boolean = false,
     onArtistClick: (() -> Unit)? = null,
 ) {
     AlbumCard(
@@ -686,6 +693,7 @@ fun AlbumCard(
         onClick = onClick,
         modifier = modifier,
         width = width,
+        fillWidth = fillWidth,
         badge = albumTypeLabel(album),
         onArtistClick = onArtistClick,
     )
@@ -699,16 +707,18 @@ fun AlbumCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     width: Int = 140,
+    fillWidth: Boolean = false,
     seed: String = "",
     coverTitle: String? = null,
     badge: String? = null,
     onArtistClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val sizeModifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(width.dp)
     Column(
         modifier = modifier
             .pressScale(interaction)
-            .width(width.dp)
+            .then(sizeModifier)
             .clickable(
                 interactionSource = interaction,
                 indication = LocalIndication.current,
@@ -777,12 +787,14 @@ fun PlaylistCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     width: Int = 140,
+    fillWidth: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val sizeModifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(width.dp)
     Column(
         modifier = modifier
             .pressScale(interaction)
-            .width(width.dp)
+            .then(sizeModifier)
             .clickable(
                 interactionSource = interaction,
                 indication = LocalIndication.current,
@@ -1032,5 +1044,141 @@ fun ErrorState(
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         androidx.compose.material3.CircularProgressIndicator()
+    }
+}
+
+data class ExpressiveSegment<T>(
+    val key: T,
+    val label: String,
+    val icon: ImageVector? = null,
+)
+
+/**
+ * Material 3 Expressive connected button group switcher.
+ *
+ * Replaces legacy full-width 50/50 TabRow bars and outlined FilterChips:
+ * outer edges are full-pill, inactive inner corners step down cleanly to 8.dp
+ * (and 4.dp on press), while the active segment springs to a full 22.dp pill
+ * on a tonal secondaryContainer surface.
+ */
+@Composable
+fun <T> ExpressiveConnectedGroup(
+    options: List<ExpressiveSegment<T>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    equalWidth: Boolean = true,
+) {
+    if (options.isEmpty()) return
+    val outerRadius = if (compact) 18.dp else 22.dp
+    val innerRestRadius = if (compact) 6.dp else 8.dp
+    val innerPressedRadius = 4.dp
+    val height = if (compact) 38.dp else 44.dp
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEachIndexed { index, option ->
+            val isSelected = option.key == selected
+            val interaction = remember(option.key) { MutableInteractionSource() }
+            val pressed by interaction.collectIsPressedAsState()
+            val isFirst = index == 0
+            val isLast = index == options.lastIndex
+
+            val baseStart = if (isFirst) outerRadius else innerRestRadius
+            val baseEnd = if (isLast) outerRadius else innerRestRadius
+            val targetStart by animateDpAsState(
+                targetValue = when {
+                    isSelected -> outerRadius
+                    pressed && !isFirst -> innerPressedRadius
+                    else -> baseStart
+                },
+                animationSpec = KwhaleMotion.springy(),
+                label = "exprStartRadius",
+            )
+            val targetEnd by animateDpAsState(
+                targetValue = when {
+                    isSelected -> outerRadius
+                    pressed && !isLast -> innerPressedRadius
+                    else -> baseEnd
+                },
+                animationSpec = KwhaleMotion.springy(),
+                label = "exprEndRadius",
+            )
+            val containerColor by animateColorAsState(
+                targetValue = when {
+                    isSelected -> MaterialTheme.colorScheme.secondaryContainer
+                    pressed -> MaterialTheme.colorScheme.surfaceContainerHighest
+                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+                animationSpec = tween(durationMillis = KwhaleMotion.durationFast),
+                label = "exprContainerColor",
+            )
+            val contentColor by animateColorAsState(
+                targetValue = if (isSelected) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                animationSpec = tween(durationMillis = KwhaleMotion.durationFast),
+                label = "exprContentColor",
+            )
+
+            val shape = RoundedCornerShape(
+                topStart = targetStart,
+                bottomStart = targetStart,
+                topEnd = targetEnd,
+                bottomEnd = targetEnd,
+            )
+            val itemModifier = if (equalWidth) Modifier.weight(1f) else Modifier
+
+            Surface(
+                shape = shape,
+                color = containerColor,
+                contentColor = contentColor,
+                modifier = itemModifier
+                    .height(height)
+                    .pressScale(interaction)
+                    .clip(shape)
+                    .semantics {
+                        role = Role.RadioButton
+                        this.selected = isSelected
+                    }
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = LocalIndication.current,
+                        onClick = { onSelect(option.key) },
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = if (compact) 12.dp else 16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (option.icon != null) {
+                        Icon(
+                            imageVector = option.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(if (compact) 16.dp else 18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = option.label,
+                        style = if (compact) {
+                            MaterialTheme.typography.labelMedium
+                        } else {
+                            MaterialTheme.typography.labelLarge
+                        },
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
