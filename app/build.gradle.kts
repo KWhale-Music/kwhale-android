@@ -5,6 +5,21 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+val appsDebugKeystore = providers.gradleProperty("APPS_DEBUG_KEYSTORE").orNull
+val appsKeystore = providers.gradleProperty("APPS_KEYSTORE").orNull
+val appsStorePassword = providers.gradleProperty("APPS_STORE_PASSWORD").orNull
+val appsKeyAlias = providers.gradleProperty("APPS_KEY_ALIAS").orNull
+val appsKeyPassword = providers.gradleProperty("APPS_KEY_PASSWORD").orNull
+
+// Dev server URL override (gitignored `local.properties`):
+//   API_BASE_URL=http://<your-lan-host>:19001/v1
+// Defaults to the Android emulator loopback of the self-hosted KWhale API.
+val localProperties = java.util.Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val devApiBaseUrl = localProperties.getProperty("API_BASE_URL", "http://10.0.2.2:19001/v1")
+
 android {
     namespace = "org.dueattendant149.kwhale"
     compileSdk = 35
@@ -18,19 +33,40 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"https://music.dueattendant149.org/v1\"")
     }
 
+    signingConfigs {
+        if (appsDebugKeystore != null) {
+            create("sharedDebug") {
+                storeFile = File(appsDebugKeystore)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+        if (appsKeystore != null && appsStorePassword != null && appsKeyAlias != null && appsKeyPassword != null) {
+            create("release") {
+                storeFile = File(appsKeystore)
+                storePassword = appsStorePassword
+                keyAlias = appsKeyAlias
+                keyPassword = appsKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
+            signingConfig = signingConfigs.findByName("sharedDebug") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = false
-            // LAN dev host (KWhale API :19001, cleartext allowed in
-            // network_security_config). For adb-reverse use 127.0.0.1 instead.
-            buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.229:19001/v1\"")
+            // Dev server: override via API_BASE_URL in (gitignored) local.properties;
+            // default is the emulator loopback of the self-hosted KWhale API.
+            // Cleartext is allowed for debug builds (see src/debug network config).
+            buildConfigField("String", "API_BASE_URL", "\"$devApiBaseUrl\"")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // TODO: подписать настоящим release-ключом (сейчас debug — ок для локального билда)
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
+                ?: error("APPS_KEYSTORE is not configured in ~/.gradle/gradle.properties")
         }
     }
 

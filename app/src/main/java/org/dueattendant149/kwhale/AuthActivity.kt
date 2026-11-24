@@ -392,11 +392,11 @@ private fun AuthScreen(
         val presets = buildList {
             add("https://music.dueattendant149.org/v1")
             if (BuildConfig.DEBUG) {
-                add("http://192.168.1.229:19001/v1")
+                add(BuildConfig.API_BASE_URL)
                 add("http://10.0.2.2:19001/v1")
                 add("http://127.0.0.1:19001/v1")
             }
-        }
+        }.distinct()
         AlertDialog(
             onDismissRequest = { showPresets = false },
             title = { Text("Серверы") },

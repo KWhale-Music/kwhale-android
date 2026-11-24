@@ -52,10 +52,10 @@ export JAVA_HOME=<jdk-17> ANDROID_HOME=<android-sdk>
 
 ## Конфигурация
 
-- `API_BASE_URL` задаётся в `app/build.gradle.kts` через `buildConfigField`:
-  - debug → `http://192.168.1.229:19001/v1` (внутренний LAN-dev хост; либо поменять на `127.0.0.1` с `adb reverse`)
+- `API_BASE_URL` задаётся через `buildConfigField` в `app/build.gradle.kts`:
+  - debug → из `API_BASE_URL` в gitignored `local.properties` (дефолт `http://10.0.2.2:19001/v1` — loopback эмулятора; для физического устройства укажите свой LAN-хост или используйте `adb reverse` с `127.0.0.1`)
   - release → `https://music.dueattendant149.org/v1`
-- Сетевая безопасность (`res/xml/network_security_config.xml`): cleartext разрешён только для локальных/LAN dev-адресов (`127.0.0.1`, `localhost`, `10.0.2.2`, `192.168.1.229`, `192.168.1.119`); публичный API — только HTTPS.
+- Сетевая безопасность: release — только HTTPS (cleartext лишь для `127.0.0.1`/`localhost`/`10.0.2.2`); debug-сборки дополнительно разрешают cleartext на любой LAN-dev-хост (`app/src/debug/res/xml/network_security_config.xml`).
 - Deep links (`AndroidManifest.xml`, `MainActivity`): `kwhale://track/{id}`, `kwhale://album/{id}`, `kwhale://artist/{id}`, `kwhale://share/{id}`.
 
 ## Сервер

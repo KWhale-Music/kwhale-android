@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- DEBUG-ONLY override: dev builds may talk cleartext to ANY host (LAN IPs,
-     adb-reverse loopback, emulator). The release config (src/main) keeps
-     HTTPS-only with a narrow localhost/LAN whitelist. -->
 <network-security-config>
+    <!-- DEBUG ONLY: cleartext is broadly permitted so any LAN dev host can be
+         used without editing resources (set the URL via API_BASE_URL in
+         local.properties). Release builds use the strict config in
+         main/res/xml/network_security_config.xml. -->
     <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

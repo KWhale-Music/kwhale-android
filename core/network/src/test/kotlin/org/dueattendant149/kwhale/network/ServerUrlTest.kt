@@ -33,8 +33,8 @@ class ServerUrlTest {
     @Test
     fun httpIsAllowedForDebugAndLan() {
         assertEquals(
-            "http://192.168.1.229:19001/v1",
-            ServerUrl.normalize("http://192.168.1.229:19001"),
+            "http://192.168.1.100:19001/v1",
+            ServerUrl.normalize("http://192.168.1.100:19001"),
         )
     }
 
