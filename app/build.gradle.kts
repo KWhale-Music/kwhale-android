@@ -67,8 +67,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Optional: without APPS_* in ~/.gradle/gradle.properties (or CI secrets)
+            // the release APK is built unsigned; debug/lint/unit tests still work.
             signingConfig = signingConfigs.findByName("release")
-                ?: error("APPS_KEYSTORE is not configured in ~/.gradle/gradle.properties")
         }
     }
 
