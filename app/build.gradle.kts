@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -14,7 +16,7 @@ val appsKeyPassword = providers.gradleProperty("APPS_KEY_PASSWORD").orNull
 // Dev server URL override (gitignored `local.properties`):
 //   API_BASE_URL=http://<your-lan-host>:19001/v1
 // Defaults to the Android emulator loopback of the self-hosted KWhale API.
-val localProperties = java.util.Properties().apply {
+val localProperties = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }

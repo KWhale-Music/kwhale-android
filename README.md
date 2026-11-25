@@ -17,7 +17,7 @@
 
 </div>
 
-Native Android client for the [KWhale Server](https://github.com/kwhale-music/kwhale-server),
+Native Android client for the [KWhale Server](https://github.com/KWhale-Music/kwhale-server),
 rebuilt from the ground up on **Jetpack Compose + Material 3**. Full theme system
 (dark / light / AMOLED / Monet + 129 accents), background playback via Media3,
 offline downloads, home-screen widget, and share links that open right into the app.
@@ -48,7 +48,7 @@ offline downloads, home-screen widget, and share links that open right into the 
 ## 🚀 Quickstart
 
 ```bash
-git clone https://github.com/kwhale-music/kwhale-android.git
+git clone https://github.com/KWhale-Music/kwhale-android.git
 cd kwhale-android
 export JAVA_HOME=<jdk-17> ANDROID_HOME=<android-sdk>
 
@@ -59,7 +59,7 @@ export JAVA_HOME=<jdk-17> ANDROID_HOME=<android-sdk>
 ./gradlew :app:assembleRelease
 ```
 
-Prebuilt APKs are attached to [GitHub Releases](https://github.com/kwhale-music/kwhale-android/releases).
+Prebuilt APKs are attached to [GitHub Releases](https://github.com/KWhale-Music/kwhale-android/releases).
 
 Point the app at your server: **Settings → server URL**, or set the debug build's default in
 (gitignored) `local.properties`:
@@ -93,7 +93,7 @@ api/            — OpenAPI 3.1 contract of KWhale Core v1 (+ mock server)
 
 ## 🧭 Author's review
 
-*Honest notes from the author — this section is a draft and will keep evolving.*
+*Honest notes from the author — trade-offs and open rough edges.*
 
 What I'm genuinely happy with:
 
@@ -111,11 +111,9 @@ What's honestly still rough:
   rollback, follow-button no-ops). The error-handling pass is the top priority.
 - **Pagination is uneven** — some lists claim totals they don't have. Honest totals are
   coming.
-- **Lint debt** — a known set of warnings (`@OptIn`, foreground service types) is still
-  open. Not dangerous, just untidy.
 
-Next up: error-handling honesty pass, download progress/retry UX, lint → 0, and a
-proper release profile (versioning, reproducible signing docs).
+Next up: error-handling honesty pass, download progress/retry UX, remaining lint warnings → 0,
+and automated APK publishing via GitHub Releases.
 
 ## 🗺 Status
 

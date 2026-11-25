@@ -17,7 +17,7 @@
 
 </div>
 
-Нативный Android-клиент для [KWhale Server](https://github.com/kwhale-music/kwhale-server),
+Нативный Android-клиент для [KWhale Server](https://github.com/KWhale-Music/kwhale-server),
 переписанный с нуля на **Jetpack Compose + Material 3**. Полная система тем
 (тёмная / светлая / AMOLED / Monet + 129 акцентов), фоновое воспроизведение через Media3,
 оффлайн-загрузки, виджет на рабочий стол и шеринг-ссылки, открывающиеся прямо в приложении.
@@ -48,7 +48,7 @@
 ## 🚀 Быстрый старт
 
 ```bash
-git clone https://github.com/kwhale-music/kwhale-android.git
+git clone https://github.com/KWhale-Music/kwhale-android.git
 cd kwhale-android
 export JAVA_HOME=<jdk-17> ANDROID_HOME=<android-sdk>
 
@@ -62,7 +62,7 @@ export JAVA_HOME=<jdk-17> ANDROID_HOME=<android-sdk>
 ./gradlew :core:network:testDebugUnitTest --no-daemon -Dorg.gradle.workers.max=2
 ```
 
-Готовые APK — в [GitHub Releases](https://github.com/kwhale-music/kwhale-android/releases).
+Готовые APK — в [GitHub Releases](https://github.com/KWhale-Music/kwhale-android/releases).
 
 Указать свой сервер: **Настройки → URL сервера** или задать дефолт для debug-сборки в
 (gitignored) `local.properties`:
@@ -96,7 +96,7 @@ api/            — OpenAPI 3.1 контракт KWhale Core v1 (+ mock)
 
 ## 🧭 Review от автора
 
-*Честные заметки автора — раздел в черновике и будет дополняться.*
+*Честные заметки автора — плюсы, компромиссы и шероховатости.*
 
 Чем я реально доволен:
 
@@ -113,11 +113,9 @@ api/            — OpenAPI 3.1 контракт KWhale Core v1 (+ mock)
 - **Тихие отказы UI.** Часть действий падает без обратной связи (optimistic-состояние
   без отката, no-op у кнопки «Подписаться»). Проход по обработке ошибок — приоритет №1.
 - **Пагинация неровная** — часть списков обещает totals, которых нет. Честные totals будут.
-- **Lint-долг** — известный набор предупреждений (`@OptIn`, типы foreground-сервисов)
-  ещё открыт. Не опасно, просто неаккуратно.
 
-Дальше: честность обработки ошибок, UX прогресса/ретраев загрузок, lint → 0,
-и нормальный release-профиль (версионирование, документация по подписи).
+Дальше: честность обработки ошибок, UX прогресса/ретраев загрузок, добивка оставшихся
+lint-предупреждений до нуля и автоматическая сборка APK через GitHub Releases.
 
 ## 🗺 Статус
 
