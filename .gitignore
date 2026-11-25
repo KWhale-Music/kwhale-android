@@ -9,3 +9,11 @@ api/mock/node_modules/
 # RE reference artifacts (декомпилят + APK)
 re/
 *.apk
+
+# GitHub safety rules
+.env
+secrets.env
+*.jks
+*.keystore
+*.dump
+*.dump.gz
