@@ -14,15 +14,16 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF.svg)](https://kotlinlang.org/)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4.svg)](https://developer.android.com/jetpack/compose)
 [![minSdk](https://img.shields.io/badge/minSdk-31-green.svg)](#)
+[![CI](https://github.com/KWhale-Music/kwhale-android/actions/workflows/ci.yml/badge.svg)](https://github.com/KWhale-Music/kwhale-android/actions/workflows/ci.yml)
 
 </div>
 
 Нативный Android-клиент для [KWhale Server](https://github.com/KWhale-Music/kwhale-server),
-переписанный с нуля на **Jetpack Compose + Material 3**. Полная система тем
+написанный с нуля на **Jetpack Compose + Material 3**. Полная система тем
 (тёмная / светлая / AMOLED / Monet + 129 акцентов), фоновое воспроизведение через Media3,
 оффлайн-загрузки, виджет на рабочий стол и шеринг-ссылки, открывающиеся прямо в приложении.
 
-## ✨ Возможности
+## Возможности
 
 - **Material 3 во всём** — динамические цвета (Monet), чёрный AMOLED, 129 акцентов,
   тёмная / светлая / системная темы.
@@ -37,15 +38,14 @@
   хосты), Bearer JWT с refresh-on-401, переживающим обрывы сети, токены в
   `EncryptedSharedPreferences`, cleartext только для loopback / debug-сборок.
 
-## 📸 Скриншоты
+## Скриншоты
 
 <div align="center">
-<img src="docs/images/screens-main.png" alt="Главная, Поиск, Библиотека, Профиль, Альбом, Исполнитель" width="100%"/>
-<br/>
-<img src="docs/images/screens-player.png" alt="Плеер, Очередь, Текст, Плейлист, Настройки, Оформление" width="100%"/>
+<img src="docs/images/screens-home.png" alt="Главная" width="48%"/>
+<img src="docs/images/screens-library.png" alt="Библиотека" width="48%"/>
 </div>
 
-## 🚀 Быстрый старт
+## Быстрый старт
 
 ```bash
 git clone https://github.com/KWhale-Music/kwhale-android.git
@@ -74,7 +74,7 @@ API_BASE_URL=http://<your-lan-host>:19001/v1
 Release-сборка по умолчанию ходит на `https://music.dueattendant149.org/v1` и переключается
 на любой инстанс KWhale прямо в UI.
 
-## ⚙️ Конфигурация
+## Конфигурация
 
 | Что | Где | Примечания |
 |---|---|---|
@@ -83,7 +83,7 @@ Release-сборка по умолчанию ходит на `https://music.duea
 | Release-подпись | `APPS_*` в `~/.gradle/gradle.properties` | стандартный release-keystore |
 | Сетевая безопасность | `res/xml/network_security_config.xml` | в release — только HTTPS; debug-сборки разрешают cleartext для LAN-dev-хостов |
 
-## 🏗 Архитектура
+## Архитектура
 
 ```
 app/            — Compose-экраны, плеер (Media3), загрузки, виджет, WorkManager
@@ -94,38 +94,17 @@ core:player     — PlaybackState (состояние плеера)
 api/            — OpenAPI 3.1 контракт KWhale Core v1 (+ mock)
 ```
 
-## 🧭 Review от автора
+## Статус
 
-*Честные заметки автора — плюсы, компромиссы и шероховатости.*
+Бета — версия `0.1.22`.
 
-Чем я реально доволен:
-
-- **Система тем.** 129 акцентов, AMOLED и Monet в одном связном `core:design` —
-  это та часть приложения, которая ощущается законченной и личной.
-- **Устойчивость сети.** Refresh-on-401 сохраняет сессию при обрывах
-  (чистится только на реально невалидном токене), а single-origin политика физически
-  не даёт стримам утечь на сторонние хосты.
-- **Оффлайн-надёжность.** Привязка загрузок к remote ID вместо URL означает, что смена
-  сервера не ломает скачанную библиотеку.
-
-Что честно ещё кривое:
-
-- **Тихие отказы UI.** Часть действий падает без обратной связи (optimistic-состояние
-  без отката, no-op у кнопки «Подписаться»). Проход по обработке ошибок — приоритет №1.
-- **Пагинация неровная** — часть списков обещает totals, которых нет. Честные totals будут.
-
-Дальше: честность обработки ошибок, UX прогресса/ретраев загрузок, добивка оставшихся
-lint-предупреждений до нуля и автоматическая сборка APK через GitHub Releases.
-
-## 🗺 Статус
-
-Бета — версия `0.1.22`, автор использует ежедневно на физическом устройстве.
-
-## 📄 Лицензия
+## Лицензия
 
 [AGPL-3.0](LICENSE) — те же условия, что у сервера.
 
-Сторонние заметки: UI сделан как *пересоздание* — код оригинальный, но набор шрифтов
-(VK Sans) и часть визуального языка отсылаются к VK X и остаются собственностью их
-владельцев; относитесь к ним как к заменяемым дизайн-ассетам. Стриминг-коннекторы живут
-в репозитории сервера и работают с сторонними сервисами на их собственных условиях.
+Исключение — шрифты **VK Sans**: они не покрываются AGPL и остаются собственностью их
+владельцев; это заменяемые дизайн-ассеты.
+
+## Благодарности
+
+UI вдохновлён **VK X**. Спасибо за визуальный язык и набор шрифтов.
